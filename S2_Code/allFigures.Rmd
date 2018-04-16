@@ -1,0 +1,837 @@
+---
+title: "Systems-level metabolic differences associated with antibiotic resistance in *Pseudomonas aeruginosa*"
+author: "Laura J Dunphy, Phillip Yen, Jason Papin "
+date: "March 29, 2018"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE, result=FALSE, echo=FALSE}
+# Uncomment this to install all required packages:
+# install.packages('readr')
+# install.packages('dplyr')
+# install.packages('ggplot2')
+# install.packages('ggthemes')
+# install.packages('tidyr')
+# install.packages('viridis')
+# install.packages('gridExtra')
+# install.packages('grid')
+# install.packages('knitr')
+# install.packages('reshape2')
+# install.packages('gplots')
+# install.packages('RColorBrewer')
+# install.packages('ggsignif')
+# install.packages('cowplot')
+# install.packages('ggpubr')
+# install.packages('gtable')
+# install.packages('png')
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, result=FALSE, echo=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(tidyr)
+library(viridis)
+library(gridExtra)
+library(grid)
+library(knitr)
+library(reshape2)
+library(gplots)
+library(RColorBrewer)
+library(ggsignif)
+library(cowplot)
+library(ggpubr)
+library(gtable)
+library(png)
+
+```
+
+
+```{r, warning=FALSE,message=FALSE, echo=FALSE, results=FALSE}
+# Load the biolog data (metabolic phenotype data)
+biologDataPM1<- read_csv("biologDataPM1.csv")
+biologDataPM2<- read_csv("biologDataPM2.csv")
+```
+
+```{r, warning=FALSE,message=FALSE, echo=FALSE, results=FALSE}
+# Load calculated growth rates, maxLnOD and lag times generated in MATLAB:
+biologGrowthDynamics <- read_csv("biologGrowthDynamics.csv")
+```
+
+```{r, warning=FALSE,message=FALSE, echo=FALSE, results=FALSE}
+### Load Data Headings
+#These are just dataframes with the names of each carbon source on PM1 and PM2a
+PM1_headers<- read_csv("headersPM1.csv")
+PM2_headers<- read_csv("headersPM2.csv")
+names(biologDataPM1) <- PM1_headers[1, ]
+names(biologDataPM2) <- PM2_headers[1, ]
+```
+
+```{r, warning=FALSE,message=FALSE, echo=FALSE, results=FALSE}
+### Tidy the biolog data
+biologPM1Tidy <- biologDataPM1 %>% 
+  filter(timePoint<=272) %>% 
+  mutate(timePoint = (timePoint-1)*638.4/60/60) %>% # each timepoint is ~638.4 seconds (~10 minutes)
+  gather("carbonSource", "OD600",5:100)
+
+biologPM2Tidy <- biologDataPM2 %>% 
+  filter(timePoint<=272) %>% 
+  mutate(timePoint = (timePoint-1)*638.4/60/60) %>% 
+  gather("carbonSource", "OD600",5:100)
+
+biologAllTidy <- rbind(biologPM1Tidy, biologPM2Tidy)
+
+biologAllStats <- biologAllTidy %>% 
+  group_by(strain, plate, timePoint, carbonSource) %>% 
+  summarize(meanOD600 = mean(OD600), stdOD600 = sd(OD600), seOD600 = sd(OD600)/sqrt(3))
+
+biologGrowthDynamicsStats <- biologGrowthDynamics %>% 
+  group_by(plate,strain, carbonSource) %>% 
+  summarise(meanGrowthRate = mean(growthRate), meanLagPhase = mean(lagPhase))
+
+# Calculating Growth/No Growth: Grab the negative controls
+NegControl <- biologAllStats %>% 
+  ungroup() %>% group_by(plate,strain,timePoint,carbonSource) %>% 
+  filter(carbonSource == 'Negative Control 1'|carbonSource == 'Negative Control 2')
+# Duplicate the negative controls at each timepoint 96 times and stack them...arrange in the same way as biologAllStats
+NegControl <- do.call("rbind", replicate(96, NegControl, simplify = FALSE)) %>% arrange(strain, plate, timePoint,carbonSource) 
+
+# Calculate the Area under the curve!!! AUC>=15 will be our official growth cutoff!!!
+biologAllStats$AUC <- biologAllStats$meanOD600 - NegControl$meanOD600
+
+#Filter out negative control wells 
+biologAllStats <- biologAllStats %>% filter(carbonSource != "Negative Control 1", carbonSource != "Negative Control 2")
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Filter the growth dynamics data (Figure 3)
+#Select only the carbon sources that support growth on all 5 strains:
+# (AUC>=15)
+# Note: the maxOD600 took the max of the AUC that way it has subtracted the Negative control at all timepoints
+biologAllGrowth <- biologAllStats %>%
+  group_by(strain,carbonSource) %>% 
+  mutate(AUCsum = sum(AUC)) %>% 
+  filter(AUCsum>=15) %>% 
+  ungroup() %>% group_by(carbonSource,timePoint) %>% 
+  mutate(numStrains=n()) %>% 
+  filter(numStrains==5) %>% 
+  ungroup() %>% group_by(strain, carbonSource) %>% 
+  summarise(maxOD600=max(AUC))
+
+#Join these carbon sources with growth dynamics (growth rate and lag phase) to filter down their data frames
+biologAllGrowthDynamics <- inner_join(biologAllGrowth, biologGrowthDynamicsStats)
+biologAllGrowthDynamics$carbonSource <- factor(biologAllGrowthDynamics$carbonSource, levels = rev(unique(biologAllGrowthDynamics$carbonSource)),ordered = TRUE)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Load Figure 4 data: nuoL on N-acetyl D-Glucosamine data 
+growthDatGlcNAcRaw <- read_csv("growthDataGlcNAc.csv")
+
+# Take the mean across replicates and subtract the mean of the negative control (blank) wells
+growthDatGlcNAc <- growthDatGlcNAcRaw %>% 
+  group_by(strain,timepoint, media) %>% 
+  summarise(meanOD600 = mean(OD600),stdOD600 = sd(OD600)) %>% 
+  mutate(carbonSource = 'N-Acetyl-D-Glucosamine')
+
+growthDatGlcNAcNegControl <- growthDatGlcNAc %>% filter(strain =='blank')
+growthDatGlcNAcNegControl <- do.call("rbind",replicate(4,growthDatGlcNAcNegControl,simplify = FALSE))
+growthDatGlcNAc$AUC <- growthDatGlcNAc$meanOD600 - growthDatGlcNAcNegControl$meanOD600
+
+# Factor the strains
+growthDatGlcNAc$strain <- factor(growthDatGlcNAc$strain, levels = c('Anc','T4','nuoL','blank'))
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+## Figure 5 Data 
+# Load the predictions and PIP deletion data
+
+# PIP mutations (via WGS in Yen and Papin 2017)
+pipRMutations <- read_csv("mutationsPIP.csv")
+# Essentiality predictions from model
+essentialityPredictionsRaw <- read_csv("geneEssentialityPredictions.csv")
+
+## Tidy the data
+
+# 1. Growth rate ratios from all gene essentiality predictions. Gr < 0.001 1 means gene is essential
+essentialityPredictions <- essentialityPredictionsRaw %>% gather("carbonSource","grRatio", -gene)
+# Filter out carbon sources for which the model could not grow in the first place (i.e. there will be NAs for grRatio)
+# Also filter out unassigned/SPONTANEOUS model artifacts
+essentialityPredictions <- essentialityPredictions %>% filter(grRatio != Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
+
+# 2. All genes in model and whether or not they were mutated in PipR (1 = mutated)
+PipRMutationBinary <- essentialityPredictions %>%  select(gene) %>% unique() %>% group_by(gene) %>% mutate(geneCount = n())
+pipRMutations <- pipRMutations %>% unique() %>% group_by(Day20P1) %>% mutate(gene = Day20P1, geneCount = n()) %>% ungroup() %>% select(-Day20P1)
+PipRMutationsBinary <- left_join(PipRMutationBinary, pipRMutations, 'gene') # fixed this to use only genes in the model!!
+PipRMutationsBinary$geneCount.y[is.na(PipRMutationsBinary$geneCount.y)] <- 0
+PipRMutationsBinary <- PipRMutationsBinary %>% ungroup() %>% group_by(gene) %>% mutate(isMutated = geneCount.y != 0, strain = 'Day20P1') 
+
+PipRMutationsMutated <- PipRMutationsBinary %>% filter(isMutated == TRUE)
+essentialityPredictionsMutated <- left_join(PipRMutationsMutated, essentialityPredictions, 'gene')
+
+# 3. Growth calls for PIP and Ancestor on carbon sources in the model
+biologPipStats <- biologAllStats %>% 
+  filter(strain == 'Day20P1' | strain == 'Day0Anc') %>% 
+  group_by(carbonSource,strain) %>% 
+  summarise(AUCsum = sum(AUC))
+modelCarbonSources <- essentialityPredictions %>% select(carbonSource) %>% unique()
+biologPipStats <- inner_join(biologPipStats, modelCarbonSources, 'carbonSource')
+biologPipStats$strain <- factor(biologPipStats$strain, levels=c('Day20P1','Day0Anc'))
+
+# 4. Filter to only include genes that are mutated in PIP that are essential on at least one carbon source
+essentialityPredictionsMutated <- essentialityPredictionsMutated %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
+  ungroup() %>% group_by(gene) %>% mutate(isEverEssential = sum(isEssential)) %>% 
+  filter(isEverEssential >= 1)
+
+essentialityPredictionsMutated$geneName <- factor(essentialityPredictionsMutated$geneName,levels=sort(unique(essentialityPredictionsMutated$geneName),decreasing=TRUE))
+
+essentialityPredictionsMutated$isEssential <- factor(essentialityPredictionsMutated$isEssential, levels =c(TRUE,FALSE), labels = c('x',''))
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Figure 6 L-Leucine/4-HBA Data
+# Load the data
+
+# Biological replicates 1-4 of ancestor, PIP and gnyA grown in 40mM L-leucine
+ancP1gnyAGrowthRaw <- read_csv("growthDataLeucine.csv")
+
+
+# All 4 replicates of Leucine/Isoleucne Anc/Pip/gnyA for figure 6C
+ancP1gnyAGrowthAllReps <- ancP1gnyAGrowthRaw %>% group_by(strain,wellID, media, timeTidy) %>%
+  summarise(OD600 = mean(data))
+ancP1gnyAGrowth <- ancP1gnyAGrowthAllReps %>% 
+  ungroup() %>% group_by(strain, media, timeTidy) %>% summarise(meanOD600 = mean(OD600), stdOD600 = sd(OD600))
+
+# All 4 replicates of Leucine/Isoleucine Anc/Pip/gnyA for Figure 6C after blank background subtraction 
+ancP1gnyANegControl <- ancP1gnyAGrowth %>% filter(strain == 'blank')
+
+ancP1gnyANegControl <- do.call("rbind", replicate(7, ancP1gnyANegControl, simplify = FALSE)) 
+ancP1gnyAGrowth$AUC <- ancP1gnyAGrowth$meanOD600 - ancP1gnyANegControl$meanOD600
+ancP1gnyAGrowth$strain <- factor(ancP1gnyAGrowth$strain, levels=c('Day0Anc','Day20P1','gnyA','blank'))
+
+
+# Biological Replicates 1+2 and 3+4 of scoA/scoB on 4HBA
+ancP1scoAB1 <- read_csv("growthData4HBA_1.csv")
+ancP1scoAB2 <- read_csv("growthData4HBA_2.csv")
+
+# Merge all 4 replicates on 4HBA together:
+ancP1scoAB12 <- rbind(ancP1scoAB1,ancP1scoAB2)
+ancP1scoAB12_AllReps <- ancP1scoAB12 %>% filter(media != 'LB') %>% group_by(strain, wellID, media, timeTidy) %>% summarise(OD600 = mean(data))
+ancP1scoABGrowth <- ancP1scoAB12_AllReps %>% ungroup() %>% group_by(strain, media, timeTidy) %>% summarise(meanOD600 = mean(OD600), stdOD600 = sd(OD600))
+
+# All 4 replicates on 4HBA after blank background subtraction:
+ancP1scoABNegControl <- ancP1scoABGrowth %>% filter(strain =='blank')
+ancP1scoABNegControl <- do.call("rbind",replicate(5,ancP1scoABNegControl,simplify = FALSE))
+ancP1scoABGrowth$AUC <- ancP1scoABGrowth$meanOD600 - ancP1scoABNegControl$meanOD600
+ancP1scoABGrowth$strain <- factor(ancP1scoABGrowth$strain, levels=c('Day0Anc','Day20P1','scoA','scoB','blank'))
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Data for Supplementary Figures: S3, S4, and S6
+
+# S3 Fig. Growth of all 4 biological replicates of TOB-evolved PA14 from Yen and Papin, 2017
+S3_fig_data <- read_csv('growthDataGlcNAc_supplementalLineages.csv')
+S3_fig_growth <- S3_fig_data %>% 
+  filter(wellID != 'border') %>% 
+  group_by(strain, wellID, timeTidy,media) %>% 
+  summarise(OD600 = mean(data), stdOD600 = sd(data))
+S3_negControl <- S3_fig_growth %>% filter(wellID == 'blank')
+S3_negControl <- do.call("rbind",replicate(7,S3_negControl, simplify=FALSE))
+S3_fig_growth$AUC <- S3_fig_growth$OD600 - S3_negControl$OD600
+S3_fig_growth$wellID <- factor(S3_fig_growth$wellID, levels=c('Day0Anc_1','Day20T1_1','Day20T2_1','Day20T3_1','Day20T4_1', 'Day20T4_2','blank'), labels=c('Ancestor','TOB-R1','TOB-R2','TOB-R3','TOB-R4','TOB-R4 2','Negative Control'))
+
+# S4 Fig. Ancestor growth with varying concentrations of the electron transport chain inhibitor CCCP
+S4_fig_data <- read_csv('growthDataGlcNAc_CCCP.csv')
+S4_fig_growth <- S4_fig_data %>% 
+  filter(wellID != 'border') %>% 
+  group_by(strain, wellID, timeTidy,media) %>% 
+  summarise(OD600 = mean(data), stdOD600 = sd(data))
+S4_negControl <- S4_fig_growth %>% filter(wellID == 'blank')
+S4_negControl <- do.call("rbind",replicate(7,S4_negControl, simplify=FALSE))
+S4_fig_growth$AUC <- S4_fig_growth$OD600 - S4_negControl$OD600
+S4_fig_growth$wellID <- factor(S4_fig_growth$wellID, levels=c('Day0Anc_NC','Day0Anc_DMSO','Day0Anc_CCCP','nuoL_NC','nuoL_DMSO','nuoL_CCCP','blank'),labels = c('Ancestor - 0uM CCCP, 0% DMSO','Ancestor - 0uM CCCP, 0.125% DMSO','Ancestor - 12.5uM CCCP, 0.125% DMSO','nuoL - 0uM CCCP, 0% DMSO','nuoL - 0uM CCCP, 0.125% DMSO','nuoL - 12.5uM CCCP, 0.125% DMSO','Negative Control'))
+
+
+
+# S6 Fig. Growth of gnyA mutant on 20mM L-Isoleucine
+S6_fig_data <- read_csv('growthDataIsoleucine_gnyA.csv')
+S6_fig_data <- S6_fig_data %>% filter(strain != 'border') %>% 
+  separate(wellID, c("biologicalRep","technicalRep"),'_') %>% 
+  group_by(strain, biologicalRep, timeTidy) %>% 
+  summarise(OD600 = mean(data))
+S6_fig_growth <- S6_fig_data %>% 
+  ungroup() %>% group_by(strain, timeTidy) %>% 
+  summarise(meanOD600 = mean(OD600), stdOD600 = sd(OD600))
+S6_negControl <- S6_fig_growth %>% filter(strain == 'blank')
+S6_negControl <- do.call("rbind",replicate(2,S6_negControl,simplify = FALSE))
+S6_fig_growth$AUC <- S6_fig_growth$meanOD600 - S6_negControl$meanOD600
+S6_fig_growth$strain <- factor(S6_fig_growth$strain, levels=c('gnyA','blank'), labels=c('gnyA','Negative Control'))
+
+
+
+
+
+
+
+```
+## **Figures**
+Note: Fig 1 and S7 Fig are not included in this document, but their figure captions are provided below.
+
+**Fig 1. Schematic of phenotypic profiling of antibiotic-resistant *Pseudomonas aeruginosa*.** (A) *P. aeruginosa* strain UCBPP-PA14 was previously adaptively evolved to three antibiotics (ciprofloxacin (CIP), piperacillin (PIP), or tobramycin (TOB)) or to LB media without drug (LBE) for 20 days. Growth of each evolved lineage was profiled by measuring the optical density at 600nm (OD600) of each lineage after inoculation on 190 unique carbon sources for 48-hours. Phenotypic data was used to calculate changes in growth dynamics. (B) Phenotypic data and previously collected whole-genome sequencing data were paired with a genome-scale metabolic network reconstruction of *P. aeruginosa* UCBPP-PA14 to predict mutations impacting loss of catabolic function in our piperacillin-evolved lineage. In brief, the model was used to predict the individual impact of each gene that was deleted from the piperacillin-evolved lineage on the ability to grow on a given carbon source. If a simulated gene knockout resulted in a loss of model growth on a carbon source where an experimental loss of catabolic function was also observed, then the prediction was experimentally validated with a transposon mutant. This process was repeated for the piperacillin-evolved lineage on 41 carbon sources that could be both experimentally and computationally evaluated. 
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE,results=TRUE,fig.align='center'}
+# Generate Figure 2
+
+# Fig2A unclustered 
+# Binary growth is plotted by carbonSource alphabetically
+Fig2Adat <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  summarise(AUCsum=sum(AUC)) %>% 
+  mutate(growth = AUCsum>=15) 
+Fig2Adat$strain <-  factor(Fig2Adat$strain, levels = rev(unique(Fig2Adat$strain)),ordered=TRUE)
+Fig2A <- Fig2Adat %>% ggplot(aes(carbonSource, strain))+
+  geom_tile(aes(fill=growth), color='black',size = 0.25)+
+  xlab("Carbon Sources")+ theme_bw() + 
+  theme(axis.ticks.x=element_blank(),
+        legend.title=element_blank(),legend.position='top',axis.title.y=element_blank(),
+        axis.title.x = element_text(margin = margin(t = -0.8, r = 0, b = 0, l = 0))) +
+  scale_fill_manual(labels = c("No Growth  ", "Growth"),values=c("white","grey50"))+
+  scale_y_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 2B
+Fig2B <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  summarise(AUCsum=sum(AUC), growth = sum(AUC)>=15) %>% 
+  ggplot(aes(AUCsum)) + geom_histogram(breaks=seq(-29, 101, by = 2),aes(fill = growth),color='black')+theme_bw()+
+  theme(legend.position = 'none')+
+  geom_vline(xintercept=c(15), linetype="dotted", size=1.25)+xlab("Area Under the Curve \n (AUC)")+ylab('Count')+
+  scale_fill_manual(values=c('white','grey50'))
+
+# Figure 2C
+Fig2C <- biologAllStats %>% 
+  ungroup() %>% group_by(strain,carbonSource) %>% 
+  filter(sum(AUC)>=15) %>% 
+  summarize(maxOD600 = max(AUC)) %>% 
+  ggplot(aes(x=strain, y = maxOD600))+
+  geom_boxplot(size=1.25, aes(color = strain))+
+  geom_signif(comparisons=list(c("Day0Anc", "Day20C2"), c("Day0Anc","Day20F4"), c("Day0Anc","Day20P1"),c("Day0Anc","Day20T3")), annotations="***", tip_length = 0, y_position = c(0.6, 0.662, 0.724, 0.786))+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+  theme_bw()+ ylim(0,0.83)+
+   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))+
+  theme(axis.text.y = element_text(size=10),axis.text.x=element_text(angle=45,hjust=1), axis.title.x=element_blank(), axis.title.y=element_text(size=12),legend.position="none")+ylab('Max Growth (OD600)')
+  
+# Figure 2D
+Fig2D <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  summarise(AUCsum=sum(AUC)) %>% 
+  mutate(growth = AUCsum>=15) %>% 
+  filter(growth == TRUE) %>% 
+  ggplot(aes(x = strain))+geom_bar(aes(y=((..count..)/190)*100), fill='grey50',color='black')+
+  ylab('% Growth Supporting \n Carbon Sources') + theme_bw() + ylim(0, 50)+
+  theme(axis.title.x=element_blank(), axis.text.x=element_text(angle=45,hjust=1))+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+
+Fig2Legend <- get_legend(Fig2A)
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE, fig.height=5, fig.width=7.5, fig.align='center'}
+#Arrange, plot and save Figure 2:
+
+Figure2 <- arrangeGrob(Fig2B, Fig2C,Fig2A+theme(legend.position = 'none', axis.text.x = element_blank()),Fig2D,Fig2Legend, nrow=4,ncol=3, layout_matrix=cbind(c(5,3,NA,1), c(5,3,NA,2),c(5,3,NA,4)), heights=c(10,75,5,110), widths=c(30,30,30))
+
+Figure2 <- as_ggplot(Figure2) + draw_plot_label(label = c("A","B","C","D"), size = 15, x = c(0, 0, 0.33, 0.67), y = c(1, 0.57,0.57,0.57))
+
+Figure2
+ggsave('Figures and Data/Fig2.tiff',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
+
+
+```
+
+**Fig 2. Summary of phenotypic growth data of antibiotic-resistant *P. aeruginosa*.** (A) Binary growth calls for each lineage (Ancestor, LBE = LB-Evolved, CIP = ciprofloxacin-resistant, PIP = piperacillin-resistant,TOB = tobramycin-resistant) across 190 unique carbon sources (white = no growth, grey = growth). (B) Histogram of the area under the curve (AUC) for all measured growth curves. A lineage was considered to have grown on a given carbon source if the AUC of the 48-hour growth curve exceeded 15. The growth/no growth cutoff is indicated by a dotted line. (C) Boxplot summarizes the maximum growth density by lineage across all carbon sources for which each lineage grew. Growth density was measured as the OD600 after subtraction of a negative control. Boxes encompass the 25th to 75th percentiles of each population. Whiskers extend up to 1.5 times the interquartile range from the closest box boundary. Data points that are out of the whisker range are outliers and are denoted by individual points. Significance denoted by Wilcoxon rank sum test (&#42;&#42;&#42;P-value < 0.001). (D) Summary of the percent of total carbon sources that supported growth of each lineage.
+
+
+``` {r, echo=FALSE, message=FALSE, warning=FALSE}
+# Generate Figure 3
+
+# Figure 3A
+Fig3A <- biologAllGrowthDynamics %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = maxOD600), color='white')+
+  xlab("")+ylab("")+theme_bw() +theme(axis.text.y = element_text(size=10), axis.text.x = element_text(angle = 45, hjust = 1), legend.position="top", legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Max Growth \n (OD600)'))+
+  scale_fill_gradient(low = "grey95", high = "black")+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 3B
+Fig3B <- biologAllGrowthDynamics %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = meanGrowthRate), color='white')+
+  xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Growth Rate \n (ln(OD600)/hr)',label.hjust=0.6))+
+  scale_fill_gradient(low = "grey95", high = "black")+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 3C
+Fig3C <- biologAllGrowthDynamics %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = meanLagPhase), color='white')+
+  xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time to Mid-Exp \n (hr)'))+
+  scale_fill_gradient(low = "grey95", high = "black", trans='log10')+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 3D
+Fig3D <- biologAllGrowthDynamics %>% 
+  ggplot(aes(x=strain, y = maxOD600))+
+  geom_boxplot(aes(color = strain), size=1.25) + 
+  geom_signif(comparisons=list(c("Day0Anc", "Day20C2"), c("Day0Anc", "Day20F4"), c("Day0Anc","Day20P1")), annotations="***", tip_length = 0, y_position = c(0.475, 0.52, 0.565))+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+
+  theme_bw()+
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="bottom",legend.title=element_blank(), axis.text.x = element_blank())+xlab("")+ylim(0,0.575)+ylab('Max Growth (OD600)')
+
+# Figure 3E
+Fig3E <- biologAllGrowthDynamics %>% 
+  ggplot(aes(x=strain, y = meanGrowthRate))+
+  geom_boxplot(aes(color = strain), size=1.25)+
+  geom_signif(comparisons=list(c("Day0Anc", "Day20F4"), c("Day0Anc","Day20P1"), c("Day0Anc","Day20T3")), annotations=c("***","***","**"), tip_length = 0, y_position = c(0.425, 0.465, 0.505))+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+  theme_bw()+
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Growth Rate (ln(OD600)/hr)')+ylim(0,0.525)
+
+# Figure 3F
+Fig3F <- biologAllGrowthDynamics %>% 
+  ggplot(aes(x=strain, y = meanLagPhase))+
+  geom_boxplot(aes(color = strain), size=1.25)+
+  geom_signif(comparisons=list(c("Day0Anc","Day20P1")), annotations = '***', tip_length = 0, y_position = 1.95)+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+  theme_bw()+ scale_y_log10(limits=c(NA,100)) + 
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab("Time to Mid-Exponential (hr)")
+
+legend_3DEF <- get_legend(Fig3D)
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=8.5, fig.width=7.5, fig.align='center'}
+# Arrange, plot, and save Figure 3
+
+# Need to do the below steps to get all subpanels to be the same widths
+ gA <- ggplotGrob(Fig3A+theme(axis.text.y = element_blank()))
+ gB <- ggplotGrob(Fig3B)
+ gC <- ggplotGrob(Fig3C)
+ gD <- ggplotGrob(Fig3D+theme(legend.position='none'))
+ gE <- ggplotGrob(Fig3E)
+ gF <- ggplotGrob(Fig3F)
+ maxWidth = grid::unit.pmax(gA$widths[2:5], gB$widths[2:5],gC$widths[2:5], gD$widths[2:5],gE$widths[2:5], gF$widths[2:5])
+
+ gA$widths[2:5] <- as.list(maxWidth)
+ gB$widths[2:5] <- as.list(maxWidth)
+ gC$widths[2:5] <- as.list(maxWidth)
+ gD$widths[2:5] <- as.list(maxWidth)
+ gE$widths[2:5] <- as.list(maxWidth)
+ gF$widths[2:5] <- as.list(maxWidth)
+
+ 
+ # Labels for each row in Figures 3A-C
+ carbonSourceLabels <- biologAllGrowthDynamics %>%
+   ungroup() %>% 
+   select(carbonSource) %>% 
+   unique() %>% 
+   ggplot() +
+   geom_rect(aes(ymin = 1, ymax = length(carbonSource)*.8,xmin = 0.35, xmax = 0.5),fill='white')+
+   geom_text(aes(x=c(0.5),y=c((1:length(carbonSource))*0.635+0.001),label=rev(carbonSource),hjust=1))+
+   theme(axis.line.x=element_line(color='white'),axis.title.x=element_blank(),axis.title.y=element_blank(),axis.ticks=element_blank(),axis.line.y=element_line(color='white'),legend.position='none',plot.margin=unit(c(0,-1.5,1.5,0),'cm'), axis.text.x=element_blank(),axis.text.y=element_blank())
+ 
+ # Arrange the subpanels 
+ Fig3 <- arrangeGrob(gA, gB,gC,gD,gE,gF,legend_3DEF,carbonSourceLabels, ncol=4, nrow =3, heights=c(98, 52, 5), layout_matrix=cbind(c(8,NA,NA),c(1,4,7),c(2,5,7), c(3,6,7)))
+
+ Figure3 <- as_ggplot(Fig3) +                                # transform to a ggplot
+  draw_plot_label(label = c("A", "B", "C","D","E","F"), size = 15,
+                  x = c(0.25, 0.5, .75, 0.25, 0.5,0.75), y = c(1, 1,1,0.4,0.4,0.4))
+ Figure3
+
+ggsave('Figures and Data/Fig3.tiff',Figure3,height=8.5, width=7.5, units="in", dpi=300)
+
+```
+**Fig 3. Growth dynamics of antibiotic-resistant *P. aeruginosa*.** For each carbon source that supported growth on all five studied lineages, growth dynamics, including the maximum growth density (OD600) (A,D), growth rate (hr$^{-1}$) (B,E), and time to reach mid-exponential phase (hr) (C,F) were calculated. Significance determined by Wilcoxon rank sum test (&#42;&#42;&#42;P-value < 0.001; &#42;&#42;P-value < 0.01).
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE,fig.height=3, fig.width=5, fig.align='center'}
+# Generate and plot Figure 4
+
+# Generate Figure 4
+Figure4 <- growthDatGlcNAc %>% 
+  ggplot(aes(x=timepoint, y = AUC))+
+  geom_ribbon(aes(ymin = AUC-stdOD600, ymax = AUC+stdOD600, fill = strain),alpha = 0.75, show.legend=FALSE)+
+  geom_line(aes(color = strain),size=1.5)+facet_wrap(~carbonSource)+
+  xlab('Time (hr)') +ylab("Growth (OD600)")+ xlim(0,49)+ylim(-0.005,0.06)+
+  scale_colour_manual(values =c('grey','dodgerblue2','green2','black'),breaks=c("Anc","T4","nuoL","blank"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')),"Negative Control")) + 
+  scale_fill_manual(values = c('grey85','lightblue2','palegreen1','grey50'),breaks=c("Anc","T4","nuoL","blank")) +theme_bw()+theme(legend.title = element_blank(), legend.text.align = 0, legend.text=element_text(size=8),strip.background = element_rect(fill='white'))
+
+# Plot and save figure 4
+Figure4
+
+ggsave('Figures and Data/Fig4.tiff',plot=Figure4, height=3, width=5, units="in",dpi=600)
+
+```
+**Fig 4. Tobramycin-resistant PA14 exhibits enhanced growth on N-Acetyl-D Glucosamine.** (A) A tobramycin-resistant PA14 lineage containing a mutation in the *nuo*L gene (blue) and a *nuoL* transposon mutant (green) grown on 20mM of N-acetyl-D-glucosamine relative to the unevolved ancestor (grey). Negative control shows the OD600 on blank media (black). TOB&#42; denotes that the tobramycin-evolved lineage is independent from the TOB lineage presented in the carbon source utilization screen (n = 4 colonies, error = standard deviation).
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 5, fig.width = 7.5, fig.align='center'}
+# Figure 5
+# Generate, arrange, plot, and save figure 5
+
+# Figure 5 Top (in vitro)
+Fig5_top <- biologPipStats %>% group_by(strain) %>% mutate(growth = AUCsum>=15) %>% 
+  ggplot(aes(carbonSource, strain, fill = growth)) + geom_tile(color = 'black',size=0.25) + 
+  theme(legend.position = 'right') + xlab("")+ylab("") + theme_bw() + 
+  theme(axis.text.x.top = element_text(size=8, angle=90, hjust=0,vjust=0.5), legend.position = 'right',legend.key=element_rect(color='grey',size=0.5), plot.margin=unit(c(0,0.2,-0.1,-0.325),'cm')) + 
+  scale_x_discrete(position = "top")+
+  scale_y_discrete(breaks=c("Day20P1", "Day0Anc"),
+        labels=c("PIP","Ancestor"))+
+  scale_fill_manual(values = c('white', 'grey50'), labels = c('No Growth    ', 'Growth'))+
+  guides(fill = guide_legend(title=expression(italic('in vitro'))))
+
+
+# Figure 5 Bottom (in silico)
+Fig5_bottom <- essentialityPredictionsMutated %>% 
+  ggplot(aes(carbonSource, geneName, fill = isEssential,label=isEssential,color=isEssential)) + geom_tile(color = 'black',size = 0.25) + 
+  geom_point(size = 0, stroke = 0) +
+  geom_text(hjust=0.5,show.legend=FALSE)+
+  xlab("")+ylab("") + theme_bw()  +
+  guides(colour = guide_legend(title= expression(italic('in silico')),override.aes = list(shape = c('x', " "),size=5)))+
+  scale_color_manual(breaks=c("x",""),labels=c("Essential","Not Essential"),values=c('black','black'))+
+  scale_fill_manual(values=c("white","white"), guide=FALSE)+
+  theme(axis.text.y = element_text(size = 8, face ='italic'),axis.text.x = element_blank(), legend.position = 'right',legend.key=element_rect(color='grey',size=0.5), axis.ticks.x = element_blank())
+
+# Get locus tag to add to bottom panel
+df <- droplevels(essentialityPredictionsMutated)
+df <- df  %>% select(geneName, gene) %>%  unique()%>% arrange(geneName)
+# df$geneName <- factor(df$geneName, levels=df[order(df$gene,df$geneName)])
+geneNames <- df %>%
+  ungroup() %>%
+  select(gene) %>%
+  unique() %>%
+  ggplot() +
+  geom_rect(aes(ymin = 0, ymax = 17,xmin = 0, xmax = 1),fill='white')+
+  geom_text(aes(x=c(0.25),y=c((1:unique(length(gene)))*0.575-0.45),label=gene,hjust=0),size=3,color='grey30')+
+  theme(axis.line.x=element_line(color='white'),axis.title.x=element_blank(),axis.title.y=element_blank(),axis.ticks=element_blank(),axis.line.y=element_line(color='white'),legend.position='none', axis.text.x=element_blank(),axis.text.y=element_blank())
+
+legend_5T <- get_legend(Fig5_top)
+legend_5B <- get_legend(Fig5_bottom)
+
+grid.arrange(Fig5_bottom+theme(legend.position = 'none'), Fig5_top+theme(legend.position = 'none'),legend_5T,legend_5B,geneNames, ncol = 3, nrow = 4, widths= c(18,75,17), heights = c(40, 15,20,20), layout_matrix=cbind(c(5,5,5,5),c(2,1,1,1), c(NA,3,4,NA)))
+
+Figure5 <- arrangeGrob(Fig5_bottom+theme(legend.position = 'none'), Fig5_top+theme(legend.position = 'none'),legend_5T,legend_5B,geneNames, ncol = 3, nrow = 4, widths= c(18,75,17), heights = c(40, 15,20,20), layout_matrix=cbind(c(5,5,5,5),c(2,1,1,1), c(NA,3,4,NA)))
+
+ggsave('Figures and Data/Fig5.tiff',Figure5,dpi=300)
+```
+**Fig 5. Model-guided prediction of loss of metabolic function in piperacillin-evolved *P. aeruginosa*.** Experimental growth calls of the piperacillin-evolved and ancestral lineages on carbon sources able to support growth on the base iPau1129 model (top). Model predicted genes essential for growth on minimal media with each carbon source (bottom). Only the subset of essential genes that were found to be deleted in the piperacillin-evolved lineage are included (*In vitro*: white = no growth, grey = growth; *in silico*: X = essential gene, blank = non-essential gene).
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 5.5, fig.width = 7.5, fig.align='center'}
+# Generate and Plot Figure 6
+
+# Figure 6A-B (png file)
+Fig6AB <- readPNG('Fig6ab.png')
+Fig6AB <- rasterGrob(Fig6AB)
+
+# Figure 6C
+Fig6C <- ancP1gnyAGrowth %>% 
+  filter(media == 'L-Leucine') %>% 
+  ggplot(aes(timeTidy, AUC))+
+  geom_ribbon(aes(ymin=AUC-stdOD600, ymax=AUC+stdOD600,fill = strain),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = strain), size = 1)+
+  facet_wrap(~media)+theme_bw()+theme(legend.position = 'right',legend.title = element_blank(), strip.background = element_rect(fill = 'white'),legend.text.align=0,legend.text = element_text(size=8))+
+  scale_y_continuous(limits = c(-0.05, 0.15))+
+  scale_colour_manual(values = c('grey','red', 'orange','black'),breaks=c("Day0Anc","Day20P1", "gnyA","blank"),labels=c('Ancestor','PIP',expression(paste(italic('gnyA'),' mutant')),'Negative Control'))+
+  scale_fill_manual(values = c('grey85','rosybrown2', 'khaki1','grey50'),breaks=c("Day0Anc","Day20P1", "gnyA","blank"))+
+  xlab('Time (hr)') +ylab("Growth (OD600)")
+
+# Figure 6D
+Fig6D <- ancP1scoABGrowth %>% 
+  ggplot(aes(timeTidy, AUC, group=strain)) +
+  geom_ribbon(aes(ymin=AUC-stdOD600, ymax=AUC+stdOD600,fill = strain),alpha = 0.75, show.legend=FALSE) +
+  geom_line(aes(color = strain, linetype=strain), size = 1)+
+  facet_wrap(~media)+
+  scale_y_continuous(limits = c(-0.05,0.35))+
+  scale_colour_manual(values=c('grey','red','goldenrod1','darkorange1','black'), breaks = c("Day0Anc","Day20P1","scoA","scoB","blank"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant')), 'Negative Control'))+
+  scale_fill_manual(values=c('grey85','rosybrown2','lemonchiffon1','khaki1','grey50'), breaks=c("Day0Anc","Day20P1","scoA","scoB","blank"))+
+  scale_linetype_manual(values=c('solid','solid','solid','dotdash','solid'), breaks = c("Day0Anc","Day20P1","scoA","scoB","blank"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant')), 'Negative Control'))+
+  xlab('Time (hr)') + ylab("Growth (OD600)")+
+  theme_bw()+
+  theme(legend.position = 'right', legend.title=element_blank(), strip.background = element_rect(fill='white'), legend.text.align=0, legend.text=element_text(size=8))
+
+# Arrange Figure 6
+  Fig6 <- arrangeGrob(Fig6AB, Fig6C, Fig6D+theme(legend.position = 'right'), ncol=2, nrow =2, widths=c(3.5, 4),layout_matrix=rbind(c(1,2),c(1,3)))
+
+ Figure6 <- as_ggplot(Fig6) +                                # transform to a ggplot
+  draw_plot_label(label = c("A","B","C","D"), size = 15,
+                  x = c(0, 0.23,0.47,0.47), y = c(1, 1,1,0.5))
+ Figure6
+ 
+ ggsave('Figures and Data/Fig6.tiff',Figure6,dpi=300)
+
+
+```
+**Fig 6. Experimental validation of model-guided gene essentiality predictions.** Pathways of L-Leucine (A) and 4-hydroxybenzoic acid (B) catabolism according to the GENRE of *P. aeruginosa*, iPau1129. Genes that were shown to be deleted in the piperacillin-evolved lineage are labelled in red. Dashed lines indicate connections to other pathways in the reconstruction. (C) Growth of the ancestral lineage (grey), piperacillin-evolved lineage (red), and a *gnyA* transposon mutant on L-Leucine. (D) Growth of the ancestral lineage (grey), piperacillin-evolved lineage (red), and *scoA* (solid orange) and *scoB* (dashed orange) transposon mutants on 4-hydroxybenzoic acid. Negative control (black) shows the OD600 of uninoculated media (n = 4 colonies, error = standard deviation).
+
+
+## **Supplemental Figures and Data**
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# S1 Data
+
+write_csv(biologAllStats,'Figures and Data/S1_Data.csv')
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# S2 Data
+
+Data_S2 <- biologAllStats %>% 
+  ungroup() %>% group_by(strain,carbonSource) %>% 
+  summarize(Area_Under_Curve = sum(AUC)) %>% 
+  mutate(Growth = Area_Under_Curve>=15)
+  
+
+write_csv(Data_S2,'Figures and Data/S2_Data.csv')
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# S3 Data
+
+write_csv(biologAllGrowthDynamics,'Figures and Data/S3_Data.csv')
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# S4 Data
+
+Data_S4 <- essentialityPredictionsRaw %>% 
+  filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
+
+write_csv(Data_S4,'Figures and Data/S4_Data.csv')
+
+```
+
+
+```{r, echo=FALSE, fig.align='center', fig.height=8.5, fig.width=7.5, message=FALSE, warning=FALSE}
+# Figure S1
+
+# Had to remove hyphens in order to get the titles in the facet to fit correctly.
+label_wrap_gen2 <- function(width = 15) {
+    function(variable, value) {
+      lapply(strwrap(gsub("-",' ',as.character(value)), width=width, simplify=FALSE), 
+            paste, collapse="\n")
+    }
+}
+
+# Figure S1 A - Plate PM1
+FigureS1A <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  filter(plate =='PM1') %>% 
+  ggplot(aes(timePoint,AUC)) + geom_line(aes(color=strain))+
+  facet_wrap(~carbonSource,10,10,labeller=label_wrap_gen2())+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+xlab('Time (hr)')+ ylab("Growth (OD600)")+
+  theme_bw()+
+  theme(legend.title=element_blank(),legend.position="top",legend.direction = "horizontal", strip.text=element_text(size=5.5), axis.text = element_text(size=7)) 
+
+# Figure S1 B - Plate PM2a
+FigureS1B <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  filter(plate =='PM2') %>% 
+  ggplot(aes(timePoint,AUC)) + geom_line(aes(color=strain))+
+  facet_wrap(~carbonSource,10,10,labeller=label_wrap_gen2())+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+xlab('Time (hr)')+ ylab("Growth (OD600)")+
+  theme_bw()+
+  theme(legend.title=element_blank(),legend.position="top",legend.direction = "horizontal", strip.text=element_text(size=5.5), axis.text = element_text(size=7)) 
+
+
+FigureS1A <- as_ggplot(arrangeGrob(FigureS1A)) +                                # transform to a ggplot
+  draw_plot_label(label = c("A"), size = 12,
+                  x = c(0), y = c(1))
+FigureS1A
+
+ggsave('Figures and Data/S1A_Fig.tiff', FigureS1A,dpi=300)
+
+FigureS1B <- as_ggplot(arrangeGrob(FigureS1B)) +                                # transform to a ggplot
+  draw_plot_label(label = c("B"), size = 12,
+                  x = c(0), y = c(1))
+FigureS1B
+
+ggsave('Figures and Data/S1B_Fig.tiff', FigureS1B,dpi=300)
+
+
+
+```
+
+**S1 Fig. Growth curves of all lineages on all carbon sources.** 48-hour growth curves of the five lineages (ancestral, LB-evolved, CIP-evolved, PIP-evolved, TOB-evolved) on 190 carbon sources. (A) Growth on carbon sources from Phenotypic Microarray Plate PM1. (B) Growth on carbon sources from Phenotypic Microarray Plate PM2a. Each curve represents the average of three biological replicates. Growth is measured as the OD600 - background, where the background was an inoculated well containing media with no carbon source.
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=8.5, fig.width=7.5, fig.align='center'}
+# Figure S2
+FigureS2Dat <- biologAllStats
+FigureS2Dat$carbonSource <- factor(FigureS2Dat$carbonSource, levels = rev(unique(FigureS2Dat$carbonSource)),ordered=TRUE)
+
+# Figure S2 A - Plate PM1
+FigureS2A <- FigureS2Dat %>% 
+  ungroup() %>% group_by(strain,carbonSource) %>% 
+  filter(plate == 'PM1') %>% 
+  summarize(sumAUC = sum(AUC)) %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = sumAUC), color='white')+
+  theme(axis.text.y = element_text(size=5), legend.position="top",legend.title=element_blank()) +
+  xlab("")+ylab("")+theme_bw() +
+  scale_fill_gradient(low = "white", high = "black")+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))+
+  guides(fill = guide_colorbar(title.hjust = 0.5, title = 'AUC'))
+
+# Figure S2 B - Plate PM2
+FigureS2B <- FigureS2Dat %>% 
+  ungroup() %>% group_by(strain,carbonSource) %>% 
+  filter(plate == 'PM2') %>% 
+  summarize(sumAUC = sum(AUC)) %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = sumAUC), color='white')+
+  theme(axis.text.y = element_text(size=5), legend.position="top",legend.title=element_blank()) +
+  xlab("")+ylab("")+theme_bw() +
+  scale_fill_gradient(low = "white", high = "black")+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))+
+  guides(fill = guide_colorbar(title.hjust = 0.5, title = 'AUC'))
+
+FigureS2A <- as_ggplot(arrangeGrob(FigureS2A)) +                                # transform to a ggplot
+  draw_plot_label(label = c("A"), size = 12,
+                  x = c(0), y = c(1))
+
+FigureS2B <- as_ggplot(arrangeGrob(FigureS2B)) +                                # transform to a ggplot
+  draw_plot_label(label = c("B"), size = 12,
+                  x = c(0), y = c(1))
+FigureS2A
+FigureS2B
+
+ggsave('Figures and Data/S2A_Fig.tiff', FigureS2A,dpi=300)
+
+ggsave('Figures and Data/S2B_Fig.tiff', FigureS2B,dpi=300)
+
+```
+**S2 Fig. Area under the curve (AUC) on all carbon sources by lineage.** The total AUC for each lineage on 190 carbon sources where the AUC = sum(growth curve - background). (A) Phenotypic Microarray Plate PM1. (B) Phenotypic Microarray Plate PM2a. The growth curves and backgrounds were averaged across three biological replicates. A lineage was considered to have grown on a given carbon source if the AUC exceeded 15.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE,fig.height=3, fig.width=5, fig.align='center'}
+# S3 Fig Plot
+FigureS3 <- S3_fig_growth %>% 
+  ggplot(aes(timeTidy, AUC))+
+  geom_ribbon(aes(ymin=AUC-stdOD600, ymax=AUC+stdOD600,fill = wellID),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = wellID), size = 1)+
+  facet_wrap(~media)+theme_bw()+theme(legend.position = 'right',legend.title = element_blank(), strip.background = element_rect(fill = 'white'),legend.text.align=0,legend.text = element_text(size=8))+
+  scale_y_continuous(limits = c(-0.005, 0.15))+
+  scale_colour_manual(values = c('grey','lightblue','turquoise1','blue3','dodgerblue','dodgerblue3','black'),breaks=c( "Ancestor","TOB-R1","TOB-R2","TOB-R3","TOB-R4","TOB-R4 2","Negative Control"))+
+  scale_fill_manual(values = c('grey85','lightcyan','paleturquoise1','lightblue','lightskyblue','lightskyblue','grey50'))+
+  xlab('Time (hr)') +ylab("Growth (OD600)")
+
+FigureS3
+
+ggsave('Figures and Data/S3_Fig.tiff', FigureS3,height = 3, width = 5,units='in',dpi=300)
+
+  
+
+```
+**S3 Fig. Four biological replicates of tobramycin-evolved *P. aeruginosa* on N-acetyl-D-glucosamine.** Growth of all four independently evolved biological replicates on 20mM N-acetyl-D-glucosamine. Replicates were previously evolved as described in the Methods. TOB-R3 was used for the biolog plate analysis (TOB, n = 1 colony). TOB-R4 contains a mutation in the nuoL gene and was used in Fig 4 (TOB&#42;, n = 2 colonies plotted independently). TOB-R1 and TOB-R2 were not used in this study (n = 1 colony each). Growth of the ancestral lineage was also measured (n = 1 colony). The negative control contains uninoculated media (error = standard deviation of seven technical replicates for each colony). 
+
+```{r, echo=FALSE, fig.align='center', fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+# S4 Fig Plot
+FigureS4 <- S4_fig_growth %>% 
+  ggplot(aes(timeTidy, AUC))+
+  geom_ribbon(aes(ymin=AUC-stdOD600, ymax=AUC+stdOD600,fill = wellID),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = wellID), size = 1)+
+  facet_wrap(~media)+theme_bw()+theme(legend.position = 'right',legend.title = element_blank(), strip.background = element_rect(fill = 'white'),legend.text.align=0,legend.text = element_text(size=8))+
+  scale_y_continuous(limits = c(-0.005, 0.1))+
+  scale_colour_manual(values = c('grey','grey60','grey50','green2','green3','lightgreen','black'))+
+  scale_fill_manual(values = c('grey95','grey90','grey85','palegreen1','palegreen2','darkseagreen1','grey50'))+
+  xlab('Time (hr)') +ylab("Growth (OD600)")
+
+FigureS4
+
+ggsave('Figures and Data/S4_Fig.tiff', FigureS4,height = 3, width = 6.5,units='in',dpi=300)
+
+
+```
+**S4 Fig. Growth *P. aeruginosa* on N-acetyl-D-glucosamine treated with an electron transport chain inhibitor.** The ancestral lineage and a *nuoL* transposon mutant were grown on N-acetyl-D-glucosamine with 12.5μM of the electron transport chain inhibitor CCCP and 0.125% DMSO. As controls, each strain was grown in 0μM CCCP with 0% DMSO and 0μM CCCP with 0.125% DMSO (n = 1 colony of each strain, error = standard deviation across 10 technical replicates for each colony).
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 8.5, fig.width = 7.5, fig.align='center'}
+# Figure S5
+
+FigS5_top <- biologPipStats %>% mutate(growth = AUCsum>=15) %>% 
+  ggplot(aes(carbonSource, strain, fill = growth)) + geom_tile(color = 'grey') + 
+  theme(legend.position = 'none') + xlab("")+ylab("") + theme_bw() + 
+  theme(axis.text.x.top = element_text(size=8, angle=90, hjust=0), axis.text.y = element_text(size = 10), legend.position = 'none') + 
+  scale_x_discrete(position = "top")+
+  scale_fill_manual(values = c('white', 'grey40'), labels = c('No Growth', 'Growth'))+
+  scale_y_discrete(breaks=c("Day20P1", "Day0Anc"),
+        labels=c("PIP","Ancestor"))
+
+essentialityPredictionsMutated <- left_join(PipRMutationsMutated, essentialityPredictions, 'gene')
+FigS5_bottom <- essentialityPredictionsMutated %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
+  ggplot(aes(carbonSource, gene, fill = isEssential)) + geom_tile(color = 'grey') + 
+   xlab("")+ylab("") + theme_bw()  +
+  theme(axis.text.y = element_text(size = 7),axis.text.x = element_blank(), legend.position = 'none') +
+  scale_fill_manual(labels = c("Not Essential", "Essential"),values=c("white","black"))
+
+grid.arrange( FigS5_top, FigS5_bottom, ncol = 1, nrow = 2, widths= c(100), heights = c(35, 100))
+
+FigureS5 <- arrangeGrob(FigS5_top, FigS5_bottom, ncol = 1, nrow = 2, widths= c(100), heights = c(35, 100))
+
+ggsave('Figures and Data/S5_Fig.tiff', FigureS5,dpi=300)
+
+```
+**S5 Fig. Complete essentiality predictions in the PIP large deletion.** Expansion of Fig 5 that includes all genes that were deleted in the piperacillin-evolved lineage and are included in the iPau1129 GENRE (*In vitro*: white = no growth, grey = growth; *in silico*: black = essential gene, white = non-essential gene).
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE,fig.height=3, fig.width=5, fig.align='center'}
+
+FigureS6 <- S6_fig_growth %>% 
+  mutate(media = 'L-Isoleucine') %>% 
+  ggplot(aes(timeTidy, AUC))+
+  geom_ribbon(aes(ymin=AUC-stdOD600, ymax=AUC+stdOD600,fill = strain),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = strain), size = 1)+
+  facet_wrap(~media)+theme_bw()+theme(legend.position = 'right',legend.title = element_blank(), strip.background = element_rect(fill = 'white'),legend.text.align=0,legend.text = element_text(size=8))+
+  scale_y_continuous(limits = c(-0.05, 0.25))+
+  scale_colour_manual(values = c('orange','black'),breaks=c( "gnyA","Negative Control"),labels=c(expression(paste(italic('gnyA'),' mutant')),'Negative Control'))+
+  scale_fill_manual(values = c('khaki1','grey50'),breaks=c( "gnyA","blank"))+
+  xlab('Time (hr)') +ylab("Growth (OD600)")
+
+FigureS6
+
+ggsave('Figures and Data/S6_Fig.tiff', FigureS6,dpi=300,height = 3, width = 5, units='in')
+```
+
+**S6 Fig. Growth of a *gnyA* transposon mutant on 20mM L-Isoleucine.** Growth (OD600) of a *gnyA* transposon mutant (orange) on 20mM of L-Isoleucine relative to a negative control (black). The negative control contains blank media (n = 6 colonies of *gnyA* mutant, error = standard deviation). 
+
+
+
+**S7 Fig. Verification of a transposon insertion in the *nuoL* gene via PCR.** The ancestral lineage (top), had a PCR product between 0.5-1kb while the *nuoL* transposon mutant (bottom) had a product between 1-2kb.
+
