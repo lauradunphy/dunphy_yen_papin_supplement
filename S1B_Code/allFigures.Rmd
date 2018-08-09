@@ -461,6 +461,11 @@ Fig2Adat <- biologAllStats %>%
   summarise(AUCsum=sum(AUCmedian)) %>% 
   mutate(growth = AUCsum>=growthCutoff) 
 Fig2Adat$strain <-  factor(Fig2Adat$strain, levels = rev(unique(Fig2Adat$strain)),ordered=TRUE)
+
+# Trying to factor the carbon sources by growth on ancestor
+carbonSourceLevels_2A <- Fig2Adat %>% filter(strain == 'Day0Anc') %>% arrange(AUCsum)
+Fig2Adat$carbonSource <- factor(Fig2Adat$carbonSource, levels = rev(carbonSourceLevels_2A$carbonSource), ordered = TRUE)
+
 Fig2A <- Fig2Adat %>% ggplot(aes(carbonSource, strain))+
   geom_tile(aes(fill=growth), color='black',size = 0.25)+
   xlab("Carbon Sources")+ theme_bw() + 
@@ -533,6 +538,8 @@ Figure2 <- as_ggplot(Figure2) + draw_plot_label(label = c("A","B","C","D"), size
 
 Figure2
 ggsave('Figures and Data/Fig2.pdf',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
+ggsave('Figures and Data/Fig2.tiff',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
+
 
 
 ```
@@ -658,6 +665,33 @@ ggsave('Figures and Data/Fig3.pdf',Figure3,height=8.5, width=7.5, units="in", dp
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE,fig.height=3, fig.width=2.5, fig.align='center'}
 # Generate and plot Figure 4 - need to replace with inter quartile...!
 
+Figure4Jitter <- growthDatGlcNAcMaximums %>% group_by(strain) %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+  # geom_point(aes(color = strain))+
+  # geom_dotplot(aes(fill = strain),
+  #              binaxis = "y",
+  #              stackdir = "center")+
+ stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 1)+
+  # geom_pointrange(mapping = aes(x = strain, y = maxOD600),
+                  # stat = "summary",
+                  # fun.ymin = function(z) {quantile(z,0.25)},
+                  # fun.ymax = function(z) {quantile(z,0.75)},
+                  # fun.y = median)+
+  geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
+  facet_wrap(~media)+
+  ylab("Max Growth (OD600)")+ylim(0,0.15)+
+  scale_color_manual(values =c('grey','dodgerblue2','green2'),breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')))) + 
+theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
+  scale_x_discrete(breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant'))))
+  
+
 # Figure 4 
 Figure4Bar <- growthDatGlcNAcDistribution %>% group_by(strain) %>% 
   ggplot(aes(strain, medianMaxOD600))+geom_col(aes(fill = strain))+
@@ -670,9 +704,11 @@ theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='
   scale_x_discrete(breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant'))))
 
 # Plot and save figure 4
-Figure4Bar
+Figure4Jitter
 
-ggsave('Figures and Data/Fig4.pdf',plot=Figure4Bar, height=3, width=2.5, units="in",dpi=600)
+ggsave('Figures and Data/Fig4.pdf',plot=Figure4Jitter, height=3, width=2.5, units="in",dpi=600)
+ggsave('Figures and Data/Fig4.tiff',plot=Figure4Jitter, height=3, width=2.5, units="in",dpi=600)
+
 
 ```
 **Fig 4. Tobramycin-resistant PA14 exhibits enhanced growth on N-Acetyl-D Glucosamine.** A tobramycin-resistant PA14 lineage containing a mutation in the *nuo*L gene (blue) and a *nuoL* transposon mutant (green) grown on 20mM of N-acetyl-D-glucosamine relative to the unevolved ancestor (grey).TOB&#42; denotes that the tobramycin-evolved lineage is independent from the TOB lineage presented in the carbon source utilization screen (n = 4 colonies, error = interquartile range.
@@ -738,37 +774,76 @@ Fig6AB <- readPNG('Fig6ab.png')
 Fig6AB <- rasterGrob(Fig6AB)
 
 # Figure 6CD :
- Fig6C2 <- ancP1gnyADistribution %>% 
-  group_by(strain, media) %>%
-  ggplot(aes(strain, medianMaxOD600))+
-  geom_col(aes(fill = strain))+
-  geom_errorbar(aes(ymin = IQ25, ymax = IQ75), width = 0.2)+
-  geom_signif(comparisons=list(c("Day0Anc", "Day20P1"), c("Day0Anc","gnyA")), annotations=c("*","*"), tip_length = 0, y_position = c(0.055,0.062))+
+ # Fig6C2 <- ancP1gnyADistribution %>% 
+ #  group_by(strain, media) %>%
+ #  ggplot(aes(strain, medianMaxOD600))+
+ #  geom_col(aes(fill = strain))+
+ #  geom_errorbar(aes(ymin = IQ25, ymax = IQ75), width = 0.2)+
+ #  geom_signif(comparisons=list(c("Day0Anc", "Day20P1"), c("Day0Anc","gnyA")), annotations=c("*","*"), tip_length = 0, y_position = c(0.055,0.062))+
+ #  facet_wrap(~media)+theme_bw()+theme(legend.position = 'none', strip.background = element_rect(fill = 'white'),axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
+ #  scale_fill_manual(values = c('grey','red', 'orange'),breaks=c("Day0Anc","Day20P1", "gnyA"),labels=c('Ancestor','PIP',expression(paste(italic('gnyA'),' mutant'))))+
+ # ylab("Max Growth (OD600)")+ylim(-0.001,0.065)+
+ #  scale_x_discrete(breaks=c("Day0Anc","Day20P1","gnyA"),
+ #        labels=c("Ancestor", "PIP", expression(paste(italic('gnyA'),' mutant'))))
+
+ # Trying to make Figure 6C points instead of bar graphs
+  Fig6C <- ancP1gnyAMaximums %>% group_by(strain) %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+ stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 1)+
+    geom_signif(comparisons=list(c("Day0Anc", "Day20P1"), c("Day0Anc","gnyA")), annotations=c("*","*"), tip_length = 0, y_position = c(0.083,0.092))+
   facet_wrap(~media)+theme_bw()+theme(legend.position = 'none', strip.background = element_rect(fill = 'white'),axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
-  scale_fill_manual(values = c('grey','red', 'orange'),breaks=c("Day0Anc","Day20P1", "gnyA"),labels=c('Ancestor','PIP',expression(paste(italic('gnyA'),' mutant'))))+
- ylab("Max Growth (OD600)")+ylim(-0.001,0.065)+
+  scale_color_manual(values = c('grey','red', 'orange'),breaks=c("Day0Anc","Day20P1", "gnyA"),labels=c('Ancestor','PIP',expression(paste(italic('gnyA'),' mutant'))))+
+ ylab("Max Growth (OD600)")+ylim(-0.001,0.098)+
   scale_x_discrete(breaks=c("Day0Anc","Day20P1","gnyA"),
         labels=c("Ancestor", "PIP", expression(paste(italic('gnyA'),' mutant'))))
+   
+
  
- 
- # Figure 6D Bar Graph 
-Fig6D2 <- ancP1scoABDistribution %>% 
-  group_by(strain, media) %>% 
-  ggplot(aes(strain, medianMaxOD600))+
-  geom_col(aes(fill = strain))+
-  geom_errorbar(aes(ymin = IQ25, ymax = IQ75), width = 0.2)+
+ # Figure 6D Point
+Fig6D <- ancP1scoABMaximums %>% group_by(strain) %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+ stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 1)+
   geom_signif(comparisons=list(c("Day0Anc", "Day20P1")), annotations=c("*"), tip_length = 0, y_position = c(0.375))+
   facet_wrap(~media)+
   scale_y_continuous(limits = c(-0.01,0.4))+
-  scale_fill_manual(values=c('grey','red','goldenrod1','darkorange1'), breaks = c("Day0Anc","Day20P1","scoA","scoB"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant'))))+
+  scale_color_manual(values=c('grey','red','goldenrod1','darkorange1'), breaks = c("Day0Anc","Day20P1","scoA","scoB"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant'))))+
  ylab("Max Growth (OD600)")+
   theme_bw()+
   theme(legend.position = 'none', strip.background = element_rect(fill='white'), axis.text.x = element_text(angle = 45, hjust = 1), axis.title.x=element_blank())+
   scale_x_discrete(breaks = c("Day0Anc","Day20P1","scoA","scoB"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant'))))
 
+  # Figure 6D Bar graph version
+# Fig6D2 <- ancP1scoABDistribution %>% 
+#   group_by(strain, media) %>% 
+#   ggplot(aes(strain, medianMaxOD600))+
+#   geom_col(aes(fill = strain))+
+#   geom_errorbar(aes(ymin = IQ25, ymax = IQ75), width = 0.2)+
+#   geom_signif(comparisons=list(c("Day0Anc", "Day20P1")), annotations=c("*"), tip_length = 0, y_position = c(0.375))+
+#   facet_wrap(~media)+
+#   scale_y_continuous(limits = c(-0.01,0.4))+
+#   scale_fill_manual(values=c('grey','red','goldenrod1','darkorange1'), breaks = c("Day0Anc","Day20P1","scoA","scoB"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant'))))+
+#  ylab("Max Growth (OD600)")+
+#   theme_bw()+
+#   theme(legend.position = 'none', strip.background = element_rect(fill='white'), axis.text.x = element_text(angle = 45, hjust = 1), axis.title.x=element_blank())+
+#   scale_x_discrete(breaks = c("Day0Anc","Day20P1","scoA","scoB"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant'))))
+
 
 # Arrange Figure 6
-  Fig6 <- arrangeGrob(Fig6AB, Fig6C2, Fig6D2, ncol=2, nrow =2, widths=c(3.5, 2.5),layout_matrix=rbind(c(1,2),c(1,3)))
+  Fig6 <- arrangeGrob(Fig6AB, Fig6C, Fig6D, ncol=2, nrow =2, widths=c(3.5, 2.5),layout_matrix=rbind(c(1,2),c(1,3)))
 
  Figure6 <- as_ggplot(Fig6) +                                # transform to a ggplot
   draw_plot_label(label = c("A","B","C","D"), size = 15,
@@ -776,6 +851,8 @@ Fig6D2 <- ancP1scoABDistribution %>%
  Figure6
  
  ggsave('Figures and Data/Fig6.pdf',Figure6,dpi=300)
+  ggsave('Figures and Data/Fig6.tiff',Figure6,dpi=300)
+
  
  # output values
 ancP1gnyADistribution
