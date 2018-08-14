@@ -1,4 +1,4 @@
-function modelout = changeMinimalMedia(model, limEx)
+function modelout = changeMinimalMedia(model, limEx, lowerBound)
 %changeMedia -  Changes the lower and upper bounds of the model's exchange
 %reactions to alter the in silico minimal media with choice of carbon source.
 
@@ -17,8 +17,12 @@ function modelout = changeMinimalMedia(model, limEx)
 % Laura Dunphy 9-22-2016
 
 % Finds the indices of the exchange reactions in the model
+if nargin < 3
+  lowerBound = -10;
+end 
+ 
 exchangerxns = [];
-for rxn = 1:length(model.rxns);
+for rxn = 1:length(model.rxns)
     exchangerxns(rxn) = strncmp('EX_',model.rxns{rxn},3);
 end
 exchangeindices = find(exchangerxns); 
@@ -63,7 +67,7 @@ limitedexchanges = limEx;
 %the limitedexchanges to -10.  Also changes the upper bound of
 %limitedexchanges to 0.
 modelout.lb(find(ismember(model.rxns,openexchanges))) = -1000*ones(size(openexchanges));
-modelout.lb(find(ismember(model.rxns,limitedexchanges))) = -10*ones(size(limitedexchanges));
+modelout.lb(find(ismember(model.rxns,limitedexchanges))) = lowerBound*ones(size(limitedexchanges));
 
 
 modelout;

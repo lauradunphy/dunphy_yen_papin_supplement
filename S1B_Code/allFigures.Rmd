@@ -370,6 +370,8 @@ hocquetGrowthRepMedian <- hocquetGrowth_1_2 %>% group_by(strain, wellID, family,
      hocquetGrowthRepDistribution <- hocquetGrowthRepMaximums %>% 
        ungroup() %>% group_by(strain, family) %>% summarise(medianMaxOD600 = median(maxOD600), IQ25 = quantile(maxOD600, 1/4), IQ75 = quantile(maxOD600, 3/4))
      hocquetGrowthRepDistribution$strain <- factor(hocquetGrowthRepDistribution$strain, levels =c("AWT","APM", "BWT","BPM", "CWT","CPM","DWT","DPM"))
+     
+     hocquetGrowthRepMaximums$strain <- factor(hocquetGrowthRepMaximums$strain, levels =c("AWT","APM", "BWT","BPM", "CWT","CPM","DWT","DPM"))
 
 ```
 
@@ -873,7 +875,7 @@ ancP1scoABGrowth %>%
 # Calculated with new method
 
 Fig7Dat <- hocquetGrowthRepDistribution
-Fig7Dat
+Fig7Dat2 <- hocquetGrowthRepMaximums
 
 Fig7A <- Fig7Dat %>%  
   filter(family == 'A') %>% 
@@ -883,6 +885,23 @@ Fig7A <- Fig7Dat %>%
   geom_signif(comparisons=list(c("AWT","APM")), annotations = c('*'), tip_length = 0, y_position = c(0.055))+
   theme_bw()+theme(legend.position = 'none',strip.text = element_blank(), strip.background = element_blank(),legend.text.align=0,axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
   scale_fill_manual(values = c('grey30','orange'),breaks=c("AWT","APM"))+
+ ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
+  scale_x_discrete(breaks=c("AWT","APM"))
+
+Fig7A2 <- Fig7Dat2 %>% 
+  filter(family == 'A') %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2, fatten = 0.5)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 0.5)+
+  geom_signif(comparisons=list(c("AWT","APM")), annotations = c('*'), tip_length = 0, y_position = c(0.055))+
+  theme_bw()+theme(legend.position = 'none',strip.text = element_blank(), strip.background = element_blank(),legend.text.align=0,axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
+  scale_color_manual(values = c('grey30','orange'),breaks=c("AWT","APM"))+
  ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
   scale_x_discrete(breaks=c("AWT","APM"))
 
@@ -897,6 +916,23 @@ Fig7B <- Fig7Dat %>%
  ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
   scale_x_discrete(breaks=c( "BWT","BPM"))
 
+Fig7B2 <- Fig7Dat2 %>% 
+  filter(family == 'B') %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2, fatten = 0.5)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 0.5)+
+  geom_signif(comparisons=list(c("BWT","BPM")), annotations = c('*'), tip_length = 0, y_position = c(0.055))+
+  theme_bw()+theme(legend.position = 'none',strip.text = element_blank(), strip.background = element_blank(),legend.text.align=0,axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
+  scale_color_manual(values = c('grey30','orange'),breaks=c("BWT","BPM"))+
+ ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
+  scale_x_discrete(breaks=c("BWT","BPM"))
+
 Fig7C <- Fig7Dat %>% 
   filter(family == 'C') %>% 
   ggplot(aes(strain, medianMaxOD600))+
@@ -905,6 +941,23 @@ Fig7C <- Fig7Dat %>%
   geom_signif(comparisons=list(c("CWT","CPM")), annotations = c('*'), tip_length = 0, y_position = c(0.055))+
   theme_bw()+theme(legend.position = 'none',strip.text = element_blank(), strip.background = element_blank(),legend.text.align=0,axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
   scale_fill_manual(values = c('grey30','orange'),breaks=c("CWT","CPM"))+
+ ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
+  scale_x_discrete(breaks=c("CWT","CPM"))
+
+Fig7C2 <- Fig7Dat2 %>% 
+  filter(family == 'C') %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2, fatten = 0.5)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 0.5)+
+  geom_signif(comparisons=list(c("CWT","CPM")), annotations = c('*'), tip_length = 0, y_position = c(0.055))+
+  theme_bw()+theme(legend.position = 'none',strip.text = element_blank(), strip.background = element_blank(),legend.text.align=0,axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
+  scale_color_manual(values = c('grey30','orange'),breaks=c("CWT","CPM"))+
  ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
   scale_x_discrete(breaks=c("CWT","CPM"))
 
@@ -919,8 +972,25 @@ Fig7D <- Fig7Dat %>%
  ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
   scale_x_discrete(breaks=c("DWT","DPM"))
 
+Fig7D2 <- Fig7Dat2 %>% 
+  filter(family == 'D') %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2, fatten = 0.5)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 0.5)+
+  geom_signif(comparisons=list(c("DWT","DPM")), annotations = c('*'), tip_length = 0, y_position = c(0.055))+
+  theme_bw()+theme(legend.position = 'none',strip.text = element_blank(), strip.background = element_blank(),legend.text.align=0,axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x = element_blank())+
+  scale_color_manual(values = c('grey30','orange'),breaks=c("DWT","DPM"))+
+ ylab("Max Growth (OD600)")+ylim(-0.001,0.06)+
+  scale_x_discrete(breaks=c("DWT","DPM"))
+
 # Arrange FIgure 7
-  Fig7 <- arrangeGrob(Fig7A, Fig7B, Fig7C, Fig7D, ncol=4, nrow =1, widths=c(1.75,1.75,1.75,1.75),layout_matrix=rbind(c(1,2,3,4)))
+  Fig7 <- arrangeGrob(Fig7A2, Fig7B2, Fig7C2, Fig7D2, ncol=4, nrow =1, widths=c(1.75,1.75,1.75,1.75),layout_matrix=rbind(c(1,2,3,4)))
 
  Figure7 <- as_ggplot(Fig7) +                                # transform to a ggplot
   draw_plot_label(label = c("A","B","C","D"), size = 15,
@@ -928,6 +998,8 @@ Fig7D <- Fig7Dat %>%
  Figure7
  
  ggsave('Figures and Data/Fig7.pdf',Figure7,dpi=300)
+  ggsave('Figures and Data/Fig7.tiff',Figure7,dpi=300)
+
 
 
 ```
