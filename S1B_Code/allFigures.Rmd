@@ -1690,3 +1690,112 @@ p7 <- c(res_AWT_APM$p.value, res_BWT_BPM$p.value, res_CWT_CPM$p.value, res_DWT_D
 p7
 ```
 
+### Extra analyses for reviewers
+
+```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
+# Looking at the variability across replicates and the impact of using the median instead of the mean on our data
+
+# Raw data: Maximums
+biologMaximums %>%  ggplot(aes(carbonSource, maxOD600, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
+
+# Raw data: Growth rates
+biologGrowthDynamics %>% ggplot(aes(carbonSource, growthRate, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
+
+# Raw data: Lag phases
+biologGrowthDynamics %>% ggplot(aes(carbonSource, lagPhase, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
+
+# Median vs Mean Max OD600
+biologMedianMeanMaxOD600 <- biologMaximums %>% 
+       ungroup() %>% group_by(strain, plate, carbonSource) %>% summarise(medianMaxOD600 = median(maxOD600), meanMaxOD600 = mean(maxOD600), maxMaxOD600 = max(maxOD600), minMaxOD600 = min(maxOD600))
+biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600, meanMaxOD600)) + geom_point()
+biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600,maxMaxOD600)) + geom_point()
+biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600, minMaxOD600)) + geom_point()
+
+
+# Median vs Mean Growth Rate
+biologGrowthDynamicsStatsExtra <- biologGrowthDynamics %>% 
+  group_by(plate,strain, carbonSource) %>% 
+  summarise(medianGrowthRate = median(growthRate), medianLagPhase = median(lagPhase), meanGrowthRate = mean(growthRate), meanLagPhase = mean(lagPhase))
+
+biologGrowthDynamicsStatsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate)) + geom_point()
+
+# Median vs Mean Lag Phase
+biologGrowthDynamicsStatsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+ geom_point()
+
+# Only looking at curves where there was growth
+biologAllGrowthDynamicsExtra <- inner_join(biologAllGrowth, biologGrowthDynamicsStatsExtra)
+biologAllGrowthDynamicsExtra <- inner_join(biologAllGrowthDynamicsExtra, biologMedianMeanMaxOD600)
+
+# biologAllGrowthDynamicsExtra %>% ggplot(aes(medianMaxOD600, meanMaxOD600))+geom_point()
+# biologAllGrowthDynamicsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate))+geom_point()
+# biologAllGrowthDynamicsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+geom_point()
+
+
+# AUC using mean vs median
+biologAllStatsExtra <- biologAllTidy %>% 
+  group_by(strain, plate, timePoint, carbonSource) %>% 
+  summarize(medianOD600 = median(OD600), meanOD600 = mean(OD600)) # added median and IQR
+
+
+# Calculating Growth/No Growth: Grab the negative controls
+NegControl <- biologAllStatsExtra %>% 
+  ungroup() %>% group_by(plate,strain,timePoint,carbonSource) %>% 
+  filter(carbonSource == 'Negative Control 1'|carbonSource == 'Negative Control 2')
+# Duplicate the negative controls at each timepoint 96 times and stack them...arrange in the same way as biologAllStats
+NegControl <- do.call("rbind", replicate(96, NegControl, simplify = FALSE)) %>% arrange(strain, plate, timePoint,carbonSource) 
+
+# Calculate the Area under the curve. AUC>=75th percentile will be our official growth cutoff
+biologAllStatsExtra$AUCmedian <- biologAllStatsExtra$medianOD600 - NegControl$medianOD600 # median
+biologAllStatsExtra$AUCmean <- biologAllStatsExtra$meanOD600 - NegControl$meanOD600
+
+biologAllStatsExtra %>% group_by(plate, strain, carbonSource) %>% summarise(AUCsum_median = sum(AUCmedian), AUCsum_mean = sum(AUCmean)) %>% ggplot(aes(AUCsum_median, AUCsum_mean))+geom_point()+geom_vline(xintercept = growthCutoff)+geom_hline(yintercept = growthCutoff)
+
+# What I would like to give to the reviewers:
+AUC_comparison <- biologAllStatsExtra %>% group_by(plate, strain, carbonSource) %>% summarise(AUC_median = sum(AUCmedian), AUC_mean = sum(AUCmean)) %>% ungroup() %>% select(AUC_median, AUC_mean,-plate,-strain)
+pearsonCor <- cor(AUC_comparison, method = 'pearson')
+labelsCor <- data.frame(x = 70, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+AUC_mean_median <- AUC_comparison %>% ggplot(aes(AUC_median, AUC_mean))+geom_point()+geom_text(data = labelsCor, aes(x = x, y = y,
+                        label = label), parse = TRUE)
+AUC_mean_median
+
+biologAllStatsExtra %>% group_by(plate,strain,carbonSource) %>% summarise(aboveMean = sum(AUCmean)>growthCutoff, aboveMedian = sum(AUCmedian)>growthCutoff, diff = aboveMean != aboveMedian) %>% group_by(diff) %>% summarise(n())
+biologAllStatsExtra %>% group_by(plate,strain,carbonSource) %>% summarise(aboveMean = sum(AUCmean)>growthCutoff, aboveMedian = sum(AUCmedian)>growthCutoff, diff = aboveMean != aboveMedian, AUCsum_mean = sum(AUCmean), AUCsum_median = sum(AUCmedian)) %>% filter(diff == TRUE) %>% View()
+# 21 differences. 16 of these switch from Growth to No Growth
+
+
+# Growth rate/Lag phase/max growth from Fig 3 correlations 
+maxGrowthDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianMaxOD600, meanMaxOD600)
+pearsonCor <- cor(maxGrowthDat, method = 'pearson')
+labelsCorMaxGrowth <- data.frame(x = 0.4, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+maxOD_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianMaxOD600, meanMaxOD600))+geom_point()+geom_text(data = labelsCorMaxGrowth, aes(x = x, y = y,
+                        label = label), parse = TRUE)
+maxOD_median_mean
+
+growthRateDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianGrowthRate, meanGrowthRate)
+pearsonCor <- cor(growthRateDat, method = 'pearson')
+labelsCorGR <- data.frame(x = 0.3, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+GR_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate))+geom_point()+geom_text(data = labelsCorGR, aes(x = x, y = y,
+                        label = label), parse = TRUE)
+GR_median_mean
+
+lagPhaseDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianLagPhase, meanLagPhase)
+pearsonCor <- cor(lagPhaseDat, method = 'pearson')
+labelsCorLP <- data.frame(x = 20, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+LP_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+geom_point()+geom_text(data = labelsCorLP, aes(x = x, y = y,
+                        label = label), parse = TRUE)
+LP_median_mean
+
+
+ ggsave('For Reviewers/AUC_median_mean.tiff', AUC_mean_median,dpi=300,height = 4, width = 4, units='in')
+  ggsave('For Reviewers/maxOD_median_mean.tiff', maxOD_median_mean,dpi=300,height = 4, width = 4, units='in')
+ ggsave('For Reviewers/GR_median_mean.tiff', GR_median_mean,dpi=300,height = 4, width = 4, units='in')
+ ggsave('For Reviewers/LP_median_mean.tiff', LP_median_mean,dpi=300,height = 4, width = 4, units='in')
+
+
+
+
+
+```
+
+```
+
