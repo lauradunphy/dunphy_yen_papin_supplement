@@ -31,6 +31,9 @@ knitr::opts_chunk$set(echo = TRUE)
 # install.packages('ggpubr')
 # install.packages('gtable')
 # install.packages('png')
+# install.packages('vegan')
+# install.packages('devtools')
+# devtools::install_github("andrie/ggdendro")
 
 ```
 
@@ -53,6 +56,8 @@ library(cowplot)
 library(ggpubr)
 library(gtable)
 library(png)
+library(vegan)
+library(ggdendro)
 
 ```
 Major changes:
@@ -462,7 +467,27 @@ Fig2Adat <- biologAllStats %>%
   group_by(strain, carbonSource) %>% 
   summarise(AUCsum=sum(AUCmedian)) %>% 
   mutate(growth = AUCsum>=growthCutoff) 
-Fig2Adat$strain <-  factor(Fig2Adat$strain, levels = rev(unique(Fig2Adat$strain)),ordered=TRUE)
+# Fig2Adat$strain <-  factor(Fig2Adat$strain, levels = rev(unique(Fig2Adat$strain)),ordered=TRUE) #unclustered
+Fig2Adat$strain <-  factor(Fig2Adat$strain, levels = rev(c("Day20T3","Day0Anc","Day20P1","Day20C2","Day20F4")),ordered=TRUE)
+
+
+# Calculate the Jaccard distances between each lineage.
+AUCdat <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  summarise(AUCsum=sum(AUCmedian)) %>% 
+  mutate(growth = as.numeric(AUCsum>=growthCutoff)) %>% 
+  select(-AUCsum) %>% 
+  spread(carbonSource, growth)
+strain_dist <- vegdist(AUCdat[,2:ncol(AUCdat)], method='jaccard')
+
+# Create dendrogram of Jaccard distances
+clust.res<-hclust(strain_dist, method = 'complete')
+hcdata <- dendro_data(clust.res, type="rectangle")
+Fig2AClust <- ggplot() + 
+  geom_segment(data=segment(hcdata), aes(x=x, y=y, xend=xend, yend=yend)) +
+  ylab('Jaccard Distance')+
+  # geom_text(data=label(hcdata), aes(x=x, y=y, label=label, hjust=0), size=3) +
+  coord_flip()+theme(axis.line = element_blank(),axis.text.y=element_blank(), axis.ticks=element_blank(), axis.title.y=element_blank(), axis.text.x = element_text(size = 6), axis.title.x=element_text(size=8))
 
 # Trying to factor the carbon sources by growth on ancestor
 carbonSourceLevels_2A <- Fig2Adat %>% filter(strain == 'Day0Anc') %>% arrange(AUCsum)
@@ -534,14 +559,25 @@ Fig2Legend <- get_legend(Fig2A)
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE, fig.height=5, fig.width=7.5, fig.align='center'}
 #Arrange, plot and save Figure 2:
 
-Figure2 <- arrangeGrob(Fig2B, Fig2C,Fig2A+theme(legend.position = 'none', axis.text.x = element_blank()),Fig2D,Fig2Legend, nrow=4,ncol=3, layout_matrix=cbind(c(5,3,NA,1), c(5,3,NA,2),c(5,3,NA,4)), heights=c(10,75,5,110), widths=c(30,30,30))
+#Old arrangement without clustering
+# Figure2 <- arrangeGrob(Fig2B, Fig2C,Fig2A+theme(legend.position = 'none', axis.text.x = element_blank()),Fig2D,Fig2Legend, nrow=4,ncol=3, layout_matrix=cbind(c(5,3,NA,1), c(5,3,NA,2),c(5,3,NA,4)), heights=c(10,75,5,110), widths=c(30,30,30))
+# 
+# Figure2 <- as_ggplot(Figure2) + draw_plot_label(label = c("A","B","C","D"), size = 15, x = c(0, 0, 0.33, 0.67), y = c(1, 0.57,0.57,0.57))
+# 
+# Figure2
+# ggsave('Figures and Data/Fig2.pdf',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
+# ggsave('Figures and Data/Fig2.tiff',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
+
+
+
+# New arrangement with clustering
+
+Figure2 <- arrangeGrob(Fig2B, Fig2C,Fig2A+theme(legend.position = 'none', axis.text.x = element_blank()),Fig2D,Fig2Legend, Fig2AClust, nrow=4,ncol=5, layout_matrix=cbind(c(5,3,NA,1), c(5,3,NA,2),c(5,3,NA,4),c(5,6,6,4),c(5,6,6,4)), heights=c(10,75,10,110), widths=c(35,35,20,5,10))
 
 Figure2 <- as_ggplot(Figure2) + draw_plot_label(label = c("A","B","C","D"), size = 15, x = c(0, 0, 0.33, 0.67), y = c(1, 0.57,0.57,0.57))
-
-Figure2
-ggsave('Figures and Data/Fig2.pdf',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
 ggsave('Figures and Data/Fig2.tiff',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
 
+Figure2
 
 
 ```
@@ -1868,6 +1904,52 @@ LP_median_mean
 
 
 ```
+
+```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
+# Fisher's exact test of uniqueness
+
+# Make the contingency tables:
+conTabDat <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  summarise(AUCsum=sum(AUCmedian)) %>% 
+  mutate(growth = AUCsum>=growthCutoff) %>% 
+  ungroup() %>% group_by(strain, growth) %>% 
+  select(-AUCsum, -carbonSource)
+ctAP <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20P1'), table(growth, strain))
+ctAF <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20F4'), table(growth, strain))
+ctAT <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20T3'), table(growth, strain))
+ctAC <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20C2'), table(growth, strain))
+
+# Perform Fisher's exact test on the contigency table 
+AP <- fisher.test(ctAP)
+AF <- fisher.test(ctAF)
+AT <- fisher.test(ctAT)
+AC <- fisher.test(ctAC)
+
+p <- c(AP$p.value, AF$p.value, AT$p.value, AC$p.value)
+# B-H correction for all pairwise comparisons
+p.adjust(p, method = 'BH')
+
+
+# Calculate the Jaccard Distance between the AUC values for each of the lineages
+AUCdat <- biologAllStats %>% 
+  group_by(strain, carbonSource) %>% 
+  summarise(AUCsum=sum(AUCmedian)) %>% 
+  mutate(growth = as.numeric(AUCsum>=growthCutoff)) %>% 
+  select(-AUCsum) %>% 
+  spread(carbonSource, growth)
+strain_dist <- vegdist(AUCdat[,2:ncol(AUCdat)], method='jaccard')
+
+# Calculate the p-values of the distances using permANOVA
+strain_pval <- adonis(strain_dist ~ AUCdat$strain, AUCdat[,2:ncol(AUCdat)],perm=999)$aov.tab[[6]][1]
+
+# Create dendrogram of Jaccard distances
+clust.res<-hclust(strain_dist, method = 'complete')
+ggdendrogram(clust.res,rotate=TRUE)
+
+# Calculate the average distances for each lineage
+strain_dist <- vegdist(AUCdat[,2:ncol(AUCdat)], method='jaccard', diag = TRUE, upper = TRUE)
+strain_dist_mat <- as.matrix(strain_dist)
 
 ```
 
