@@ -158,6 +158,12 @@ biologAllGrowth <- biologAllStats %>%
 #Join these carbon sources with growth dynamics (growth rate and lag phase) to filter down their data frames
 biologAllGrowthDynamics <- inner_join(biologAllGrowth, biologGrowthDynamicsStats)
 biologAllGrowthDynamics <- inner_join(biologAllGrowthDynamics, biologMedianMaxOD600)
+# biologAllGrowthDynamics$carbonSource <- factor(biologAllGrowthDynamics$carbonSource, levels = rev(unique(biologAllGrowthDynamics$carbonSource)),ordered = TRUE)
+
+# Load descriptors for these carbon sources 
+Fig3_CarbonSourceDescriptors <- read_csv('carbonSourceDescriptors.csv')
+biologAllGrowthDynamics <- inner_join(biologAllGrowthDynamics,Fig3_CarbonSourceDescriptors)
+biologAllGrowthDynamics <- biologAllGrowthDynamics %>% arrange(description)
 biologAllGrowthDynamics$carbonSource <- factor(biologAllGrowthDynamics$carbonSource, levels = rev(unique(biologAllGrowthDynamics$carbonSource)),ordered = TRUE)
 ```
 
@@ -684,8 +690,8 @@ legend_3DEF <- get_legend(Fig3D)
    unique() %>% 
    ggplot() +
    geom_rect(aes(ymin = 1, ymax = length(carbonSource)*.8,xmin = 0.35, xmax = 0.5),fill='white')+
-   geom_text(aes(x=c(0.5),y=c((1:length(carbonSource))*0.635+0.001),label=rev(carbonSource),hjust=1))+
-   theme(axis.line.x=element_line(color='white'),axis.title.x=element_blank(),axis.title.y=element_blank(),axis.ticks=element_blank(),axis.line.y=element_line(color='white'),legend.position='none',plot.margin=unit(c(0,-1.5,1.5,0),'cm'), axis.text.x=element_blank(),axis.text.y=element_blank())
+   geom_text(aes(x=c(0.5),y=c((1:length(carbonSource))*0.6),label=rev(carbonSource),hjust=1))+
+   theme(axis.line.x=element_line(color='white'),axis.title.x=element_blank(),axis.title.y=element_blank(),axis.ticks=element_blank(),axis.line.y=element_line(color='white'),legend.position='none',plot.margin=unit(c(-0.35,-1.5,1.6,0),'cm'), axis.text.x=element_blank(),axis.text.y=element_blank())
  
  # Arrange the subpanels 
  Fig3 <- arrangeGrob(gA, gB,gC,gD,gE,gF,legend_3DEF,carbonSourceLabels, ncol=4, nrow =3, heights=c(98, 52, 5), layout_matrix=cbind(c(8,NA,NA),c(1,4,7),c(2,5,7), c(3,6,7)))
@@ -695,6 +701,7 @@ legend_3DEF <- get_legend(Fig3D)
                   x = c(0.25, 0.5, .75, 0.25, 0.5,0.75), y = c(1, 1,1,0.4,0.4,0.4))
  Figure3
 
+ggsave('Figures and Data/Fig3.tiff',Figure3,height=8.5, width=7.5, units="in", dpi=300)
 ggsave('Figures and Data/Fig3.pdf',Figure3,height=8.5, width=7.5, units="in", dpi=300)
 
 ```
