@@ -612,12 +612,22 @@ Fig3A <- biologAllGrowthDynamics %>%
   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
 
-# Figure 3B
+# Figure 3B - Growth Rate
+# Fig3B_GR <- biologAllGrowthDynamics %>%
+#   ggplot(aes(x=strain, y=carbonSource)) +
+#   geom_tile(aes(fill = medianGrowthRate), color='white')+
+#   xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Growth Rate \n (ln(OD600)/hr)',label.hjust=0.6))+
+#   scale_fill_gradient(low = "grey95", high = "black")+
+#   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+#         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 3B - Doubling Time
 Fig3B <- biologAllGrowthDynamics %>% 
+  mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% 
   ggplot(aes(x=strain, y=carbonSource)) +
-  geom_tile(aes(fill = medianGrowthRate), color='white')+
-  xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Growth Rate \n (ln(OD600)/hr)',label.hjust=0.6))+
-  scale_fill_gradient(low = "grey95", high = "black")+
+  geom_tile(aes(fill = medianDoublingTime), color='white')+
+  xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Doubling Time \n (hr)',label.hjust=0.6))+
+  scale_fill_gradient(low = "grey95", high = "black", trans='log10', limits=c(1, 30))+
   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
 
@@ -639,14 +649,23 @@ Fig3D <- biologAllGrowthDynamics %>%
   theme_bw()+
   theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="bottom",legend.title=element_blank(), axis.text.x = element_blank())+xlab("")+ylim(0,0.62)+ylab('Max Growth (OD600)')
 
-# Figure 3E
+# Figure 3E - Growth Rate
+# Fig3E_GR <- biologAllGrowthDynamics %>%
+#   ggplot(aes(x=strain, y = medianGrowthRate))+
+#   geom_boxplot(aes(color = strain), size=1.25)+
+#   geom_signif(comparisons=list(c("Day0Anc", "Day20F4"), c("Day0Anc","Day20P1"), c("Day0Anc","Day20T3")), annotations=c("***","***","**"), tip_length = 0, y_position = c(0.425, 0.465, 0.505))+
+#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+#   theme_bw()+
+#   theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Growth Rate (ln(OD600)/hr)')+ylim(0,0.525)
+
+# Figure 3E - Doubling Time
 Fig3E <- biologAllGrowthDynamics %>% 
-  ggplot(aes(x=strain, y = medianGrowthRate))+
+  mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% 
+  ggplot(aes(x=strain, y = medianDoublingTime))+
   geom_boxplot(aes(color = strain), size=1.25)+
-  geom_signif(comparisons=list(c("Day0Anc", "Day20F4"), c("Day0Anc","Day20P1"), c("Day0Anc","Day20T3")), annotations=c("***","***","**"), tip_length = 0, y_position = c(0.425, 0.465, 0.505))+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+
-  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Growth Rate (ln(OD600)/hr)')+ylim(0,0.525)
+  theme_bw()+scale_y_log10(limits=c(1,30))+
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Doubling Time (hr)')
 
 # Figure 3F
 Fig3F <- biologAllGrowthDynamics %>% 
@@ -1960,3 +1979,18 @@ strain_dist_mat <- as.matrix(strain_dist)
 
 ```
 
+```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
+# Window size and doubling times
+# Ideally, I want the window size to be the maximum it can be without being longer than the doubling time of a substantial number of curves. I will test this by plotting the fraction of total growth curves (960) with doubling times less than a large number of window sizes. 
+
+# Look at the fraction of curves longer than different window sizes
+fractions = list()
+for (i in 1:1440) {
+    fractions[[i]] <- biologGrowthDynamicsStats %>% ungroup() %>% mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% filter(medianDoublingTime <= i/60) %>% summarise(time = i/60, frac = (1 - n()/960))}
+windowSize_vs_Fractions = do.call(rbind, fractions)
+
+windowSizePlot <- windowSize_vs_Fractions %>% ggplot(aes(time, frac)) + geom_line(size = 1.5)+geom_vline(xintercept = 80/60, linetype="dotted", size = 1.5)+xlab('Window Size (hr)')+ylab('Fraction of Doubling Times Shorter than Window Size')
+windowSizePlot
+
+ggsave('For Reviewers/window_size_vs_frac_DT.tiff', windowSizePlot,dpi=300,height = 4, width = 4, units='in')
+```
