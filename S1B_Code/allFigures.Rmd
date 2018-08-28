@@ -58,6 +58,7 @@ library(gtable)
 library(png)
 library(vegan)
 library(ggdendro)
+library(scales)
 
 ```
 Major changes:
@@ -1281,32 +1282,73 @@ ggsave('Figures and Data/S3_Fig.tiff', FigureS3,height = 5, width = 7.5,units='i
 
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 8.5, fig.width = 7.5, fig.align='center'}
-# Figure S4 - adjusted for median
-
-FigS4_top <- biologPipStats %>% mutate(growth = AUCsum>=growthCutoff) %>% 
+# Figure S4A - adjusted for median
+FigS4A_top <- biologPipStats %>% mutate(growth = AUCsum>=growthCutoff) %>% 
   ggplot(aes(carbonSource, strain, fill = growth)) + geom_tile(color = 'grey') + 
   theme(legend.position = 'none') + xlab("")+ylab("") + theme_bw() + 
-  theme(axis.text.x.top = element_text(size=8, angle=90, hjust=0), axis.text.y = element_text(size = 10), legend.position = 'none') + 
+  theme(axis.text.x.top = element_text(size=6, angle=90, hjust=0), axis.text.y = element_text(size = 6), legend.position = 'none') + 
+  
   scale_x_discrete(position = "top")+
   scale_fill_manual(values = c('white', 'grey40'), labels = c('No Growth', 'Growth'))+
   scale_y_discrete(breaks=c("Day20P1", "Day0Anc"),
-        labels=c("PIP","Ancestor"))
+        labels=c("Day 20 PIP 1","Ancestor"))
 
 essentialityPredictionsMutated <- left_join(PipRMutationsMutated, essentialityPredictions, 'gene')
-FigS4_bottom <- essentialityPredictionsMutated %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
+FigS4A_bottom <- essentialityPredictionsMutated %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
   ggplot(aes(carbonSource, gene, fill = isEssential)) + geom_tile(color = 'grey') + 
    xlab("")+ylab("") + theme_bw()  +
-  theme(axis.text.y = element_text(size = 7),axis.text.x = element_blank(), legend.position = 'none') +
+  theme(axis.text.y = element_text(size = 6),axis.text.x = element_blank(), legend.position = 'none') +
   scale_fill_manual(labels = c("Not Essential", "Essential"),values=c("white","black"))
 
-grid.arrange( FigS4_top, FigS4_bottom, ncol = 1, nrow = 2, widths= c(100), heights = c(35, 100))
+# Figure S4 B - Essentiality predictions for the other 3 piperacillin-evolved lineages
+pip234dat_raw <- read_csv('For Reviewers/PipDeletionsAllLineages.csv')
+pip234dat_raw <- inner_join(Data_S4,pip234dat_raw)
 
-FigureS4 <- arrangeGrob(FigS4_top, FigS4_bottom, ncol = 1, nrow = 2, widths= c(100), heights = c(35, 100))
+pip234dat <- pip234dat_raw %>% gather("carbonSource","grRatio", -gene,-strain)
+# Filter out carbon sources for which the model could not grow in the first place (i.e. there will be NAs for grRatio)
+# Also completeDeletions out unassigned/SPONTANEOUS model artifacts
+pip234dat <- pip234dat %>% filter(grRatio != Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
+
+
+essentialDeletions234 <- pip234dat  %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
+  ungroup() %>% group_by(gene) %>% mutate(isEverEssential = sum(isEssential)) %>% 
+  filter(isEverEssential >= 1)
+
+essentialDeletions234$isEssential <- factor(essentialDeletions234$isEssential, levels =c(TRUE,FALSE), labels = c('x',''))
+
+essentialDeletions234$carbonSource <- factor(essentialDeletions234$carbonSource, levels = carbonSourceLevels)
+
+getColors <- brewer_pal('qual') 
+myPalette <- getColors(2)
+names(myPalette) <- levels(essentialDeletions234$strain) # Give every color an appropriate name
+
+
+FigS4B <- essentialDeletions234 %>% filter(strain == 'Day20P2') %>% 
+  ggplot(aes(carbonSource, gene, fill = isEssential)) + geom_tile(color = 'grey') + 
+   xlab("")+ylab("") + theme_bw()  +
+  theme(axis.text.y = element_text(size = 7 ),axis.text.x = element_blank(), legend.position = 'none') +
+  scale_fill_manual(labels = c("Essential", "Not Essential"),values=c("black","white"))
+
+
+FigS4C <- essentialDeletions234 %>% filter(strain == 'Day20P3') %>% 
+  ggplot(aes(carbonSource, gene, fill = isEssential)) + geom_tile(color = 'grey') + 
+   xlab("")+ylab("") + theme_bw()  +
+  theme(axis.text.y = element_text(size = 7 ),axis.text.x = element_blank(), legend.position = 'none') +
+  scale_fill_manual(labels = c("Essential", "Not Essential"),values=c("black","white"))
+
+
+FigS4 <- arrangeGrob(FigS4A_top, FigS4A_bottom, FigS4B,FigS4C, ncol = 1, nrow = 4, widths= c(100), heights = c(1.8, 5.5,0.5,1.2))
+
+ FigureS4 <- as_ggplot(FigS4) +                                # transform to a ggplot
+  draw_plot_label(label = c("A","B","C"), size = 15,
+                  x = c(0, 0,0), y = c(1,0.25,0.19))
+
+grid.arrange(FigS4A_top, FigS4A_bottom, FigS4B,FigS4C, ncol = 1, nrow = 4, widths= c(100), heights = c(1.8, 5.5,0.5,1.2))
 
 ggsave('Figures and Data/S4_Fig.tiff', FigureS4,dpi=300)
 
 ```
-**S4 Fig. Complete essentiality predictions in the PIP large deletion.** Expansion of Fig 5 that includes all genes that were deleted in the piperacillin-evolved lineage and are included in the iPau1129 GENRE (*In vitro*: white = no growth, grey = growth; *in silico*: black = essential gene, white = non-essential gene).
+**S4 Fig. Complete essentiality predictions in the PIP large deletion.** A) Expansion of Fig 5 that includes all genes that were deleted in the piperacillin-evolved lineage and are included in the iPau1129 GENRE. Additional unique essential gene predictions for B) lineage Day 20 Pip Replicate 2 and C) lineage Day 20 Pip Replicate 3.  (*In vitro*: white = no growth, grey = growth; *in silico*: black = essential gene, white = non-essential gene).
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE,fig.height=8, fig.width=4, fig.align='center'}
 
@@ -1984,13 +2026,49 @@ strain_dist_mat <- as.matrix(strain_dist)
 # Ideally, I want the window size to be the maximum it can be without being longer than the doubling time of a substantial number of curves. I will test this by plotting the fraction of total growth curves (960) with doubling times less than a large number of window sizes. 
 
 # Look at the fraction of curves longer than different window sizes
-fractions = list()
-for (i in 1:1440) {
-    fractions[[i]] <- biologGrowthDynamicsStats %>% ungroup() %>% mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% filter(medianDoublingTime <= i/60) %>% summarise(time = i/60, frac = (1 - n()/960))}
-windowSize_vs_Fractions = do.call(rbind, fractions)
+# fractions = list()
+# for (i in 1:1440) {
+#     fractions[[i]] <- biologGrowthDynamicsStats %>% ungroup() %>% mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% filter(medianDoublingTime <= i/60) %>% summarise(time = i/60, frac = (1 - n()/960))}
+# windowSize_vs_Fractions = do.call(rbind, fractions)
+# 
+# windowSizePlot <- windowSize_vs_Fractions %>% ggplot(aes(time, frac)) + geom_line(size = 1.5)+geom_vline(xintercept = 80/60, linetype="dotted", size = 1.5)+xlab('Window Size (hr)')+ylab('Fraction of Doubling Times Longer than Window Size \n (Population Collected with Window Size = 1.33 hr)')+theme(axis.title.y = element_text(size = 10))
+# windowSizePlot
+# 
+# ggsave('For Reviewers/window_size_vs_frac_DT.tiff', windowSizePlot,dpi=300,height = 4, width = 4, units='in')
+```
 
-windowSizePlot <- windowSize_vs_Fractions %>% ggplot(aes(time, frac)) + geom_line(size = 1.5)+geom_vline(xintercept = 80/60, linetype="dotted", size = 1.5)+xlab('Window Size (hr)')+ylab('Fraction of Doubling Times Shorter than Window Size')
-windowSizePlot
+```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
+otherPipDeletions <- read_csv('For Reviewers/PipDeletionsAllLineages.csv')
+completeDeletionsRaw <- inner_join(Data_S4,otherPipDeletions)
 
-ggsave('For Reviewers/window_size_vs_frac_DT.tiff', windowSizePlot,dpi=300,height = 4, width = 4, units='in')
+completeDeletions <- completeDeletionsRaw %>% gather("carbonSource","grRatio", -gene,-strain)
+# Filter out carbon sources for which the model could not grow in the first place (i.e. there will be NAs for grRatio)
+# Also completeDeletions out unassigned/SPONTANEOUS model artifacts
+completeDeletions <- completeDeletions %>% filter(grRatio != Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
+
+
+essentialDeletions <- completeDeletions %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
+  ungroup() %>% group_by(gene) %>% mutate(isEverEssential = sum(isEssential)) %>% 
+  filter(isEverEssential >= 1)
+
+essentialDeletions$isEssential <- factor(essentialDeletions$isEssential, levels =c(TRUE,FALSE), labels = c('x',''))
+
+essentialDeletions$carbonSource <- factor(essentialDeletions$carbonSource, levels = carbonSourceLevels)
+
+getColors <- brewer_pal('qual') 
+myPalette <- getColors(2)
+names(myPalette) <- levels(essentialDeletions$strain) # Give every color an appropriate name
+
+
+FigReviewer3 <- essentialDeletions %>% 
+  ggplot(aes(carbonSource, gene, fill = isEssential)) + geom_tile(color = 'grey') + 
+   xlab("")+ylab("") + theme_bw()  +
+  theme(axis.text.y = element_text(size = 7 ),axis.text.x = element_text(angle = 90,hjust = 1), legend.position = 'none') +
+  scale_fill_manual(labels = c("Not Essential", "Essential"),values=c("white","black"))
+
+FigReviewer3
+
+ggsave('For Reviewers/otherPIPlineages.tiff', FigReviewer3,dpi=300)
+
+
 ```

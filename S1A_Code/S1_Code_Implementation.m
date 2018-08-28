@@ -21,8 +21,10 @@ sampleData = struct('time',time,'data',data,'wellNames',{wellNames});
 
 
 
-% Without figures
-growthDynamics = calcGrowthDynamics(sampleData);
+%% Without figures
+growthDynamics = calcGrowthDynamics(sampleData, 8);
+
+
 
 % sampleGrowthDynamics is a new structure with all the info of sampleData
 % plus growth rates and times to mid-exp for each growth curve.
@@ -38,7 +40,6 @@ growthDynamics = calcGrowthDynamics(sampleData);
 % Red line shows where slope was calculated. Left side of red line was
 % determined to be the time to mid-exponential phase. 
 
-% growthDynamics = calcGrowthDynamics(sampleData,1);
-
+% growthDynamics = calcGrowthDynamics(sampleData,8,1);
 
 

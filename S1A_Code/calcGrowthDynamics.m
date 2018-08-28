@@ -1,4 +1,4 @@
-function growthDynamicsStruct = calcGrowthDynamics(growthStruct,generateFigures)
+function growthDynamicsStruct = calcGrowthDynamics(growthStruct,windowSize, generateFigures)
 % S1 Code
 % Dunphy, Yen, and Papin 2018
 % Calculate the growth rate and time to mid-exponential phase from raw
@@ -18,6 +18,7 @@ function growthDynamicsStruct = calcGrowthDynamics(growthStruct,generateFigures)
         % wellNames - n x 1 matrix with labels for each well. 
             % The example code well names are carbon sources from Biolog
             % Phenotypic Microarray plates
+    % windowSize - number of time points to use to calculate growth stats
     % generateFigures - binary call to plot individual curves and growth
     % rate locations (1) or omit plots (0). Default = 0. 
 
@@ -25,7 +26,7 @@ function growthDynamicsStruct = calcGrowthDynamics(growthStruct,generateFigures)
 % added under a field, "growthRate", and time to mid-exponential added under field
 % "lagPhase"
 
-if nargin > 1
+if nargin > 2
   genFigures = generateFigures;
 else
   genFigures = 0;
@@ -48,9 +49,12 @@ for j = 1:length(growthStruct.wellNames)
     % Set parameters
     % These parameters were optimized by comparing to growth rate measures
     % by hand
-    windowSize = 8; % number of points included in each sliding window calculation
+%     windowSize = 8; % number of points included in each sliding window calculation
     slopeThresh = 0.75; % Multiplied by the max growth rate to determine other exponential phase windows
+%     slopeThresh = 1; %LJD 8/23
     neighborThresh = 15; % max distance apart in linrange points can be
+%     neighborThresh = 0; % LJD 8/23/18...undo this at end!!!
+
     stationaryThresh = 1; % fraction of max lnOD after which we assume stationary
     
     % Identify valid time range to identify exponential phase by finding
@@ -79,9 +83,11 @@ for j = 1:length(growthStruct.wellNames)
         time = growthStruct.time(i:i+(windowSize-1));
         data = growthStruct.lnData(j,i:i+(windowSize-1));
         m = polyfit(time, data, 1);
+%         m = (data(j, end) - data(j,1))./(time(end)-time(1));
         % Save slope
         slopes = [slopes, m(1)];
     end 
+    
     
     % Filter slopes so that we only consider those prior to stationary
     % phase
@@ -133,7 +139,7 @@ for j = 1:length(growthStruct.wellNames)
         growthStruct.lagPhase(j,1) = 0;
     else
         linRangeStart = min(linRange);
-        linRangeStop = max(linRange) + 4;
+        linRangeStop = max(linRange) + 0.5*windowSize; % changed from + 4 to plus half window size
         P = polyfit(growthStruct.time(linRangeStart:linRangeStop), growthStruct.lnData(j,linRangeStart:linRangeStop),1);
         growthStruct.growthRate(j,1) = P(1);
         growthStruct.lagPhase(j,1) = growthStruct.time(linRangeStart);
@@ -143,14 +149,15 @@ for j = 1:length(growthStruct.wellNames)
    if genFigures == 1
     figure()
     subplot(3,1,1)
-    scatter(growthStruct.time, growthStruct.data(j,:),5,'k'); hold on; ylabel('OD'); axis([0 48 0 1]);
+    scatter(growthStruct.time, growthStruct.data(j,:),5,'k'); hold on; ylabel('OD'); %axis([0 48 0 1]);
     legend(num2str(max(growthStruct.data(j,:))));title(growthStruct.wellNames(j));
     
     subplot(3,1,2);
     scatter(growthStruct.time, growthStruct.lnData(j,:),5,'k'); hold on; ylabel('lnOD'); 
     plot(growthStruct.time,ones(1,length(growthStruct.time))*max(growthStruct.lnData(j,:))*stationaryThresh,'c'); scatter(growthStruct.time(stationaryTime), stationaryThresh*max(growthStruct.lnData(j,:)),'m');
     plot(growthStruct.time(linRangeStart:linRangeStop), growthStruct.time(linRangeStart:linRangeStop)*P(1) + P(2),'-r','LineWidth',5)
-    axis([0 48 -2.5 0.1]); legend(num2str(max(growthStruct.lnData(j,:))));
+    %axis([0 48 -2.5 0.1]); 
+    legend(num2str(max(growthStruct.lnData(j,:))));
     
     subplot(3,1,3);
     scatter(growthStruct.time(1:end-(windowSize-1)),slopes,5,'k'); 
