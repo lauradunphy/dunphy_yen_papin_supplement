@@ -221,49 +221,93 @@ growthDynamics_Fig3$carbonSource <- factor(growthDynamics_Fig3$carbonSource, lev
 ```
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
-# Load Figure 4 data: nuoL on N-acetyl D-Glucosamine data - added median
-growthDatGlcNAcRaw <- read_csv("growthDataNAG.csv")
+# Load Figure 4 data: nuoL on N-acetyl D-Glucosamine data 
+# Data for Figure 4A (Anc, LBE 1-4, TOB 1-4)
+Fig4ADat_raw_1 <- read_csv('growthDataNAG_1.csv')
+Fig4ADat_raw_2 <- read_csv('growthDataNAG_2.csv')
+Fig4ADat_raw <- rbind(Fig4ADat_raw_1, Fig4ADat_raw_2)
 
-# Take the median across replicates and subtract the median of the negative control (blank) wells
-# growthDatGlcNAc <- growthDatGlcNAcRaw %>%
-#   group_by(strain,timepoint, media) %>% 
-#   summarise(medianOD600 = median(OD600), IQ25 = quantile(OD600, 1/4), IQ75 = quantile(OD600, 3/4)) %>% 
-#   mutate(carbonSource = 'N-Acetyl-D-Glucosamine')
+# Data for Figure 4B (Anc, 8 transposon mutants)
+Fig4BDat_raw_1 <- read_csv('growthDataNAG_3.csv')
+Fig4BDat_raw_2 <- read_csv('growthDataNAG_4.csv')
+Fig4B_key <- read_csv('NAG_mutants_key.csv')
+Fig4BDat_raw <- rbind(Fig4BDat_raw_1, Fig4BDat_raw_2)
+Fig4BDat_raw <- inner_join(Fig4BDat_raw, Fig4B_key)
 
-growthDatGlcNAcAllReps <- growthDatGlcNAcRaw %>% group_by(strain,wellID, media, timeTidy) %>%
-  summarise(OD600 = median(data)) %>% filter(media == 'N-Acetyl-D-Glucosamine') # CHANGED THIS TO MEDIAN
+Fig4ADat <- Fig4ADat_raw %>% group_by(strain, wellID,media,timeTidy) %>% summarise(OD600 = median(data)) %>% filter(media == 'N-Acetyl-D-Glucosamine')
+
+Fig4BDat <- Fig4BDat_raw %>% group_by(strain, wellID,media,timeTidy) %>% summarise(OD600 = median(data)) %>% filter(media == 'N-Acetyl-D-Glucosamine')
 
 # Calculate the distribution of optical maximum densities:
      # 1. Subtract the minimum OD600 from each isolate curve from the entire curve
-growthDatGlcNAcMinimums <- growthDatGlcNAcAllReps %>% ungroup() %>% group_by(strain, wellID, media) %>% filter(media == 'N-Acetyl-D-Glucosamine') %>% summarise(minOD600 = min(OD600))
-     growthDatGlcNAcMinimums <- do.call("rbind", replicate(272, growthDatGlcNAcMinimums, simplify = FALSE))
-     growthDatGlcNAcMinimums <- growthDatGlcNAcMinimums %>% arrange(wellID)
-     growthDatGlcNAcAllReps$minSubtractedOD600 <- growthDatGlcNAcAllReps$OD600 - growthDatGlcNAcMinimums$minOD600
+Fig4AMinimums <- Fig4ADat %>% ungroup() %>% group_by(strain, wellID, media) %>% filter(media == 'N-Acetyl-D-Glucosamine') %>% summarise(minOD600 = min(OD600))
+     Fig4AMinimums <- do.call("rbind", replicate(272, Fig4AMinimums, simplify = FALSE))
+     Fig4AMinimums <- Fig4AMinimums %>% arrange(wellID)
+     Fig4ADat$minSubtractedOD600 <- Fig4ADat$OD600 - Fig4AMinimums$minOD600
+     
+Fig4BMinimums <- Fig4BDat %>% ungroup() %>% group_by(strain, wellID, media) %>% filter(media == 'N-Acetyl-D-Glucosamine') %>% summarise(minOD600 = min(OD600))
+     Fig4BMinimums <- do.call("rbind", replicate(272, Fig4BMinimums, simplify = FALSE))
+     Fig4BMinimums <- Fig4BMinimums %>% arrange(wellID)
+     Fig4BDat$minSubtractedOD600 <- Fig4BDat$OD600 - Fig4BMinimums$minOD600
      
      # 2. Take the maximum of each min-subtracted isolate curve (stats calculated from this)
-     growthDatGlcNAcMaximums <- growthDatGlcNAcAllReps %>% ungroup() %>% group_by(strain, wellID, media) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(strain != 'blank')
+     Fig4AMaximums <- Fig4ADat %>% ungroup() %>% group_by(strain, wellID, media) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(strain != 'blank')
+     
+     Fig4BMaximums <- Fig4BDat %>% ungroup() %>% group_by(strain, wellID, media) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(strain != 'blank')
      
      # 3. Calculate median and IQR of each strain (used for plotting Fig 4)
-     growthDatGlcNAcDistribution <- growthDatGlcNAcMaximums %>% 
+     Fig4ADistribution <- Fig4AMaximums %>% 
        ungroup() %>% group_by(strain, media) %>% summarise(medianMaxOD600 = median(maxOD600), IQ25 = quantile(maxOD600, 1/4), IQ75 = quantile(maxOD600, 3/4))
-     growthDatGlcNAcDistribution$strain <- factor(growthDatGlcNAcDistribution$strain, levels =c('Day0Anc','Day20T4','nuoL','blank'))
+     Fig4AMaximums$strain <- factor(Fig4AMaximums$strain, levels =c('Day0Anc','Day20C1','Day20C2','Day20C3','Day20C4','Day20T1','Day20T2','Day20T3','Day20T4'))
+     
+       Fig4BDistribution <- Fig4BMaximums %>% 
+       ungroup() %>% group_by(strain, media) %>% summarise(medianMaxOD600 = median(maxOD600), IQ25 = quantile(maxOD600, 1/4), IQ75 = quantile(maxOD600, 3/4))
+     Fig4BMaximums$strain <- factor(Fig4BMaximums$strain, levels = c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))     
 
-# Background subtract and calculate median + IQR for growth curves
-growthDatGlcNAc <- growthDatGlcNAcAllReps %>% filter(media == "N-Acetyl-D-Glucosamine") %>% 
-  ungroup() %>% group_by(strain, media, timeTidy) %>% summarise(medianOD600 = median(OD600), IQ25 = quantile(OD600, 1/4), IQ75 = quantile(OD600,3/4)) %>% mutate(carbonSource = "N-Acetyl-D-Glucosamine")
+# growthDatGlcNAcRaw <- read_csv("growthDataNAG.csv")
+# 
+# # Take the median across replicates and subtract the median of the negative control (blank) wells
+# # growthDatGlcNAc <- growthDatGlcNAcRaw %>%
+# #   group_by(strain,timepoint, media) %>% 
+# #   summarise(medianOD600 = median(OD600), IQ25 = quantile(OD600, 1/4), IQ75 = quantile(OD600, 3/4)) %>% 
+# #   mutate(carbonSource = 'N-Acetyl-D-Glucosamine')
+# 
+# growthDatGlcNAcAllReps <- growthDatGlcNAcRaw %>% group_by(strain,wellID, media, timeTidy) %>%
+#   summarise(OD600 = median(data)) %>% filter(media == 'N-Acetyl-D-Glucosamine') # CHANGED THIS TO MEDIAN
+# 
+# # Calculate the distribution of optical maximum densities:
+#      # 1. Subtract the minimum OD600 from each isolate curve from the entire curve
+# growthDatGlcNAcMinimums <- growthDatGlcNAcAllReps %>% ungroup() %>% group_by(strain, wellID, media) %>% filter(media == 'N-Acetyl-D-Glucosamine') %>% summarise(minOD600 = min(OD600))
+#      growthDatGlcNAcMinimums <- do.call("rbind", replicate(272, growthDatGlcNAcMinimums, simplify = FALSE))
+#      growthDatGlcNAcMinimums <- growthDatGlcNAcMinimums %>% arrange(wellID)
+#      growthDatGlcNAcAllReps$minSubtractedOD600 <- growthDatGlcNAcAllReps$OD600 - growthDatGlcNAcMinimums$minOD600
+#      
+#      # 2. Take the maximum of each min-subtracted isolate curve (stats calculated from this)
+#      growthDatGlcNAcMaximums <- growthDatGlcNAcAllReps %>% ungroup() %>% group_by(strain, wellID, media) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(strain != 'blank')
+#      
+#      # 3. Calculate median and IQR of each strain (used for plotting Fig 4)
+#      growthDatGlcNAcDistribution <- growthDatGlcNAcMaximums %>% 
+#        ungroup() %>% group_by(strain, media) %>% summarise(medianMaxOD600 = median(maxOD600), IQ25 = quantile(maxOD600, 1/4), IQ75 = quantile(maxOD600, 3/4))
+#      growthDatGlcNAcDistribution$strain <- factor(growthDatGlcNAcDistribution$strain, levels =c('Day0Anc','Day20T4','nuoL','blank'))
+# 
 
-growthDatGlcNAcNegControl <- growthDatGlcNAc %>% filter(strain =='blank')
-growthDatGlcNAcNegControl <- do.call("rbind",replicate(4,growthDatGlcNAcNegControl,simplify = FALSE))
-
-growthDatGlcNAc$AUCmedian <- growthDatGlcNAc$medianOD600 - growthDatGlcNAcNegControl$medianOD600
-# subtract median from the interquartile ranges to shift them down by an equal amount
-growthDatGlcNAc$IQ25 <- growthDatGlcNAc$IQ25 - growthDatGlcNAcNegControl$medianOD600
-growthDatGlcNAc$IQ75 <- growthDatGlcNAc$IQ75 - growthDatGlcNAcNegControl$medianOD600
-
-
-
-# Factor the strains
-growthDatGlcNAc$strain <- factor(growthDatGlcNAc$strain, levels = c('Day0Anc','Day20T4','nuoL','blank'))
+     
+# # Background subtract and calculate median + IQR for growth curves
+# # growthDatGlcNAc <- growthDatGlcNAcAllReps %>% filter(media == "N-Acetyl-D-Glucosamine") %>% 
+#   ungroup() %>% group_by(strain, media, timeTidy) %>% summarise(medianOD600 = median(OD600), IQ25 = quantile(OD600, 1/4), IQ75 = quantile(OD600,3/4)) %>% mutate(carbonSource = "N-Acetyl-D-Glucosamine")
+# 
+# growthDatGlcNAcNegControl <- growthDatGlcNAc %>% filter(strain =='blank')
+# growthDatGlcNAcNegControl <- do.call("rbind",replicate(4,growthDatGlcNAcNegControl,simplify = FALSE))
+# 
+# growthDatGlcNAc$AUCmedian <- growthDatGlcNAc$medianOD600 - growthDatGlcNAcNegControl$medianOD600
+# # subtract median from the interquartile ranges to shift them down by an equal amount
+# growthDatGlcNAc$IQ25 <- growthDatGlcNAc$IQ25 - growthDatGlcNAcNegControl$medianOD600
+# growthDatGlcNAc$IQ75 <- growthDatGlcNAc$IQ75 - growthDatGlcNAcNegControl$medianOD600
+# 
+# 
+# 
+# # Factor the strains
+# growthDatGlcNAc$strain <- factor(growthDatGlcNAc$strain, levels = c('Day0Anc','Day20T4','nuoL','blank'))
 
 ```
 
@@ -444,18 +488,37 @@ hocquetGrowthRepMedian <- hocquetGrowth_1_2 %>% group_by(strain, wellID, family,
 # S3 and S4 left as median of technical replicates
 # S6 median and IQR across isolates
 
-# S3 Fig. Growth of all 4 biological replicates of TOB-evolved PA14 from Yen and Papin, 2017
-S3_fig_data <- read_csv('growthDataGlcNAc_supplementalLineages.csv')
-S3_fig_growth <- S3_fig_data %>% 
-  filter(wellID != 'border') %>% 
-  group_by(strain, wellID, timeTidy,media) %>% 
-  summarise(OD600 = median(data), IQ25 = quantile(data, 1/4), IQ75 = quantile(data,3/4))
-S3_negControl <- S3_fig_growth %>% filter(wellID == 'blank')
-S3_negControl <- do.call("rbind",replicate(7,S3_negControl, simplify=FALSE))
-S3_fig_growth$AUC <- S3_fig_growth$OD600 - S3_negControl$OD600
-S3_fig_growth$IQ25 <- S3_fig_growth$IQ25 - S3_negControl$OD600
-S3_fig_growth$IQ75 <- S3_fig_growth$IQ75 - S3_negControl$OD600
-S3_fig_growth$wellID <- factor(S3_fig_growth$wellID, levels=c('Day0Anc_1','Day20T1_1','Day20T2_1','Day20T3_1','Day20T4_1', 'Day20T4_2','blank'), labels=c('Ancestor','TOB-R1','TOB-R2','TOB-R3','TOB-R4','TOB-R4 2','Negative Control'))
+# S3A and B data. Growth curves of all 4 biological replicates of TOB-evolved and LBE-evolved PA14 from Yen and Papin. Growth curves of all 8 mutants shown in Figure 4B
+S3A_fig_data <- Fig4ADat %>% group_by(strain, media, timeTidy) %>% filter(wellID != 'blank_0') %>% summarise(medianOD600 = median(OD600), IQ25 = quantile(OD600, 1/4), IQ75 = quantile(OD600,3/4))
+
+S3B_fig_data <- Fig4BDat %>% group_by(strain, media, timeTidy)%>% filter(wellID != 'blank_0') %>% summarise(medianOD600 = median(OD600), IQ25 = quantile(OD600, 1/4), IQ75 = quantile(OD600,3/4))
+
+S3A_negControl <- S3A_fig_data %>% filter(strain == 'blank')
+S3A_negControl <- do.call("rbind",replicate(10,S3A_negControl, simplify=FALSE))
+S3A_fig_data$AUCmedian <- S3A_fig_data$medianOD600 - S3A_negControl$medianOD600
+S3A_fig_data$IQ25 <- S3A_fig_data$IQ25 - S3A_negControl$medianOD600
+S3A_fig_data$IQ75 <- S3A_fig_data$IQ75 - S3A_negControl$medianOD600
+S3A_fig_data$strain <- factor(S3A_fig_data$strain, levels=c('Day0Anc','Day20C1','Day20C2','Day20C3','Day20C4','Day20T1','Day20T2','Day20T3','Day20T4','blank'), labels=c('Ancestor','LBE-R1','LBE-R2','LBE-R3','LBE-R4','TOB-R1','TOB-R2','TOB-R3','TOB-R4','Negative Control'))
+
+S3B_negControl <- S3B_fig_data %>% filter(strain == 'blank')
+S3B_negControl <- do.call("rbind",replicate(10,S3B_negControl, simplify=FALSE))
+S3B_fig_data$AUCmedian <- S3B_fig_data$medianOD600 - S3B_negControl$medianOD600
+S3B_fig_data$IQ25 <- S3B_fig_data$IQ25 - S3B_negControl$medianOD600
+S3B_fig_data$IQ75 <- S3B_fig_data$IQ75 - S3B_negControl$medianOD600
+S3B_fig_data$strain <- factor(S3B_fig_data$strain, levels=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850','blank'), labels=c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850','Negative Control'))
+
+# # S3 Fig. Growth of all 4 biological replicates of TOB-evolved PA14 from Yen and Papin, 2017
+# S3_fig_data <- read_csv('growthDataGlcNAc_supplementalLineages.csv')
+# S3_fig_growth <- S3_fig_data %>% 
+#   filter(wellID != 'border') %>% 
+#   group_by(strain, wellID, timeTidy,media) %>% 
+#   summarise(OD600 = median(data), IQ25 = quantile(data, 1/4), IQ75 = quantile(data,3/4))
+# S3_negControl <- S3_fig_growth %>% filter(wellID == 'blank')
+# S3_negControl <- do.call("rbind",replicate(7,S3_negControl, simplify=FALSE))
+# S3_fig_growth$AUC <- S3_fig_growth$OD600 - S3_negControl$OD600
+# S3_fig_growth$IQ25 <- S3_fig_growth$IQ25 - S3_negControl$OD600
+# S3_fig_growth$IQ75 <- S3_fig_growth$IQ75 - S3_negControl$OD600
+# S3_fig_growth$wellID <- factor(S3_fig_growth$wellID, levels=c('Day0Anc_1','Day20T1_1','Day20T2_1','Day20T3_1','Day20T4_1', 'Day20T4_2','blank'), labels=c('Ancestor','TOB-R1','TOB-R2','TOB-R3','TOB-R4','TOB-R4 2','Negative Control'))
 
 # S4 Fig. Ancestor growth with varying concentrations of the electron transport chain inhibitor CCCP 
 S4_fig_data <- read_csv('growthDataGlcNAc_CCCP.csv')
@@ -814,16 +877,11 @@ ggsave('Figures and Data/Fig3.pdf',Figure3,height=8.5, width=7.5, units="in", dp
 ```
 **Fig 3. Growth dynamics of antibiotic-resistant *P. aeruginosa*.** For each carbon source that supported growth on all five studied lineages, growth dynamics, including the maximum growth density (OD600) (A,D), growth rate (hr$^{-1}$) (B,E), and time to reach mid-exponential phase (hr) (C,F) were calculated. Significance determined by Wilcoxon rank sum test (&#42;&#42;&#42;P-value < 0.001; &#42;&#42;P-value < 0.01).
 
-```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE,fig.height=3, fig.width=2.5, fig.align='center'}
-# Generate and plot Figure 4 - need to replace with inter quartile...!
-
-Figure4Jitter <- growthDatGlcNAcMaximums %>% group_by(strain) %>% 
+```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE,fig.height=6, fig.width=5, fig.align='center'}
+# Generate a new Figure 4
+  Figure4AJitter <- Fig4AMaximums %>% group_by(strain) %>% 
   ggplot(aes(strain, maxOD600))+
   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
-  # geom_point(aes(color = strain))+
-  # geom_dotplot(aes(fill = strain),
-  #              binaxis = "y",
-  #              stackdir = "center")+
  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
                  geom = "crossbar", width = 0.2)+
   geom_errorbar(stat = "summary",
@@ -831,35 +889,84 @@ Figure4Jitter <- growthDatGlcNAcMaximums %>% group_by(strain) %>%
                   fun.ymax = function(z) {quantile(z,0.75)},
                   fun.y = median,
                 width = 0.1, size = 1)+
-  # geom_pointrange(mapping = aes(x = strain, y = maxOD600),
-                  # stat = "summary",
-                  # fun.ymin = function(z) {quantile(z,0.25)},
-                  # fun.ymax = function(z) {quantile(z,0.75)},
-                  # fun.y = median)+
-  geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
+  # geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
   facet_wrap(~media)+
-  ylab("Max Growth (OD600)")+ylim(0,0.15)+
-  scale_color_manual(values =c('grey','dodgerblue2','green2'),breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')))) + 
+  ylab("Max Growth (OD600)")+ylim(0,0.20)+
+  scale_color_manual(values =c('grey','black','black','black','black', 'dodgerblue2','dodgerblue2','dodgerblue2','dodgerblue2'),breaks=c("Day0Anc","Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3","Day20T4"),labels=c("Ancestor","LBE 1","LBE 2","LBE 3","LBE 4","TOB 1","TOB 2","TOB 3","TOB 4"))+
 theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
-  scale_x_discrete(breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant'))))
+  scale_x_discrete(breaks=c("Day0Anc","Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3","Day20T4"),labels=c("Ancestor","LBE 1","LBE 2","LBE 3","LBE 4","TOB 1","TOB 2","TOB 3","TOB 4"))
   
-
-# Figure 4 
-Figure4Bar <- growthDatGlcNAcDistribution %>% group_by(strain) %>% 
-  ggplot(aes(strain, medianMaxOD600))+geom_col(aes(fill = strain))+
-  geom_errorbar(aes(ymin = IQ25, ymax = IQ75), width = 0.2)+
-  geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
+  Figure4BJitter <- Fig4BMaximums %>% group_by(strain) %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+ stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 1)+
+  # geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
   facet_wrap(~media)+
-  ylab("Max Growth (OD600)")+ylim(0,0.15)+
-  scale_fill_manual(values =c('grey','dodgerblue2','green2'),breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')))) + 
+  ylab("Max Growth (OD600)")+ylim(0,0.20)+
+  scale_color_manual(values =c('grey','green2','green2','green2','green2', 'green2','green2','green2','green2'),breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))+
 theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
-  scale_x_discrete(breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant'))))
+  scale_x_discrete(breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))
+ 
+# Arrange Figure 4
+  Fig4 <- arrangeGrob(Figure4AJitter, Figure4BJitter, ncol=1, nrow =2, heights=c(3,3),layout_matrix=cbind(c(1,2)))
 
-# Plot and save figure 4
-Figure4Jitter
+ Figure4 <- as_ggplot(Fig4) +                                # transform to a ggplot
+  draw_plot_label(label = c("A","B"), size = 15,
+                  x = c(0,0), y = c(1,0.5))
+ Figure4
+ 
 
-ggsave('Figures and Data/Fig4.pdf',plot=Figure4Jitter, height=3, width=2.5, units="in",dpi=600)
-ggsave('Figures and Data/Fig4.tiff',plot=Figure4Jitter, height=3, width=2.5, units="in",dpi=600)
+  ggsave('Figures and Data/Fig4.tiff',Figure4,dpi=300)
+
+# Figure4Jitter <- growthDatGlcNAcMaximums %>% group_by(strain) %>% 
+#   ggplot(aes(strain, maxOD600))+
+#   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+#   # geom_point(aes(color = strain))+
+#   # geom_dotplot(aes(fill = strain),
+#   #              binaxis = "y",
+#   #              stackdir = "center")+
+#  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+#                  geom = "crossbar", width = 0.2)+
+#   geom_errorbar(stat = "summary",
+#                   fun.ymin = function(z) {quantile(z,0.25)},
+#                   fun.ymax = function(z) {quantile(z,0.75)},
+#                   fun.y = median,
+#                 width = 0.1, size = 1)+
+#   # geom_pointrange(mapping = aes(x = strain, y = maxOD600),
+#                   # stat = "summary",
+#                   # fun.ymin = function(z) {quantile(z,0.25)},
+#                   # fun.ymax = function(z) {quantile(z,0.75)},
+#                   # fun.y = median)+
+#   geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
+#   facet_wrap(~media)+
+#   ylab("Max Growth (OD600)")+ylim(0,0.15)+
+#   scale_color_manual(values =c('grey','dodgerblue2','green2'),breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')))) + 
+# theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
+#   scale_x_discrete(breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant'))))
+#   
+# 
+# # Figure 4 
+# Figure4Bar <- growthDatGlcNAcDistribution %>% group_by(strain) %>% 
+#   ggplot(aes(strain, medianMaxOD600))+geom_col(aes(fill = strain))+
+#   geom_errorbar(aes(ymin = IQ25, ymax = IQ75), width = 0.2)+
+#   geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
+#   facet_wrap(~media)+
+#   ylab("Max Growth (OD600)")+ylim(0,0.15)+
+#   scale_fill_manual(values =c('grey','dodgerblue2','green2'),breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')))) + 
+# theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
+#   scale_x_discrete(breaks=c("Day0Anc","Day20T4","nuoL"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant'))))
+# 
+# # Plot and save figure 4
+# Figure4Jitter
+# 
+# ggsave('Figures and Data/Fig4.pdf',plot=Figure4Jitter, height=3, width=2.5, units="in",dpi=600)
+# ggsave('Figures and Data/Fig4.tiff',plot=Figure4Jitter, height=3, width=2.5, units="in",dpi=600)
 
 
 ```
@@ -1307,25 +1414,49 @@ ggsave('Figures and Data/S2B_Fig.tiff', FigureS2B,dpi=300)
 
 ```{r, echo=FALSE, warning=TRUE, message=FALSE,fig.height=5, fig.width=7.5, fig.align='center'}
 # Supplmentary Figure 3
-# A) Growth curves of TOB lineages on NAG - median technical replicates
-FigS3A <- S3_fig_growth %>% 
-  ggplot(aes(timeTidy, AUC))+
-  geom_ribbon(aes(ymin=IQ25, ymax=IQ75,fill = wellID),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = wellID), size = 1)+
+
+# A) Growth curves of Ancestor, TOB and LBE lineages on NAG - median biological replicates. Subtract blank
+FigS3A <- S3A_fig_data %>% 
+  ggplot(aes(timeTidy, AUCmedian))+
+  geom_ribbon(aes(ymin=IQ25, ymax=IQ75,fill = strain),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = strain), size = 1)+
   facet_wrap(~media)+theme_bw()+theme(legend.position = 'right',legend.title = element_blank(), strip.background = element_rect(fill = 'white'),legend.text.align=0,legend.text = element_text(size=8))+
-  scale_y_continuous(limits = c(-0.005, 0.15))+
-  scale_colour_manual(values = c('grey','lightblue','turquoise1','blue3','dodgerblue','dodgerblue3','black'),breaks=c( "Ancestor","TOB-R1","TOB-R2","TOB-R3","TOB-R4","TOB-R4 2","Negative Control"))+
-  scale_fill_manual(values = c('grey85','lightcyan','paleturquoise1','lightblue','lightskyblue','lightskyblue','grey50'))+
+  scale_y_continuous(limits = c(-0.005, 0.2))+
+  scale_colour_manual(values = c('grey','grey20','grey30','grey40','grey50','lightblue','turquoise1','blue3','dodgerblue','black'),breaks=c( "Ancestor","LBE-R1","LBE-R2","LBE-R3","LBE-R4","TOB-R1","TOB-R2","TOB-R3","TOB-R4","Negative Control"))+
+  scale_fill_manual(values = c('grey85','grey85','grey85','grey85','grey85','lightcyan','paleturquoise1','lightblue','lightskyblue','grey50'))+
   xlab('Time (hr)') +ylab("Growth (OD600)")
 
-# B) Growth curves of data from Figure 4
-FigS3B <- growthDatGlcNAc %>% 
-  ggplot(aes(x=timeTidy, y = AUCmedian))+
-  geom_ribbon(aes(ymin = IQ25, ymax = IQ75, fill = strain),alpha = 0.75, show.legend=FALSE)+
-  geom_line(aes(color = strain),size=1)+
-  facet_wrap(~carbonSource)+
-  xlab('Time (hr)') +ylab("Growth (OD600)")+ xlim(0,49)+ylim(-0.005,0.15)+
-  scale_colour_manual(values =c('grey','dodgerblue2','green2','black'),breaks=c("Day0Anc","Day20T4","nuoL","blank"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')),"Negative Control")) + 
-  scale_fill_manual(values = c('grey85','lightblue2','palegreen1','grey50'),breaks=c("Day0Anc","Day20T4","nuoL","blank")) +theme_bw()+theme(legend.title = element_blank(), legend.text.align = 0, legend.text=element_text(size=8),strip.background = element_rect(fill='white'))
+
+# B) Growth curves of Ancestor and 8 transposon mutants on NAG - median biological replicates. Subtract blank
+FigS3B <- S3B_fig_data %>% 
+  ggplot(aes(timeTidy, AUCmedian))+
+  geom_ribbon(aes(ymin=IQ25, ymax=IQ75,fill = strain),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = strain), size = 1)+
+  facet_wrap(~media)+theme_bw()+theme(legend.position = 'right',legend.title = element_blank(), strip.background = element_rect(fill = 'white'),legend.text.align=0,legend.text = element_text(size=8))+
+  scale_y_continuous(limits = c(-0.005, 0.2))+
+  scale_colour_manual(values = c('grey','greenyellow','lightgreen','green2','green3','darkolivegreen3','darkolivegreen2','green4','forestgreen','black'),breaks=c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850','Negative Control'))+
+  scale_fill_manual(values = c('grey85','palegreen1','palegreen1','palegreen1','palegreen1','palegreen1','palegreen1','palegreen1','palegreen1','grey50'))+
+  xlab('Time (hr)') +ylab("Growth (OD600)")
+
+
+
+# # A) Growth curves of TOB lineages on NAG - median technical replicates
+# FigS3A <- S3_fig_growth %>% 
+#   ggplot(aes(timeTidy, AUC))+
+#   geom_ribbon(aes(ymin=IQ25, ymax=IQ75,fill = wellID),alpha = 0.75, show.legend=FALSE) +geom_line(aes(color = wellID), size = 1)+
+#   facet_wrap(~media)+theme_bw()+theme(legend.position = 'right',legend.title = element_blank(), strip.background = element_rect(fill = 'white'),legend.text.align=0,legend.text = element_text(size=8))+
+#   scale_y_continuous(limits = c(-0.005, 0.15))+
+#   scale_colour_manual(values = c('grey','lightblue','turquoise1','blue3','dodgerblue','dodgerblue3','black'),breaks=c( "Ancestor","TOB-R1","TOB-R2","TOB-R3","TOB-R4","TOB-R4 2","Negative Control"))+
+#   scale_fill_manual(values = c('grey85','lightcyan','paleturquoise1','lightblue','lightskyblue','lightskyblue','grey50'))+
+#   xlab('Time (hr)') +ylab("Growth (OD600)")
+
+# # B) Growth curves of data from Figure 4
+# FigS3B <- growthDatGlcNAc %>% 
+#   ggplot(aes(x=timeTidy, y = AUCmedian))+
+#   geom_ribbon(aes(ymin = IQ25, ymax = IQ75, fill = strain),alpha = 0.75, show.legend=FALSE)+
+#   geom_line(aes(color = strain),size=1)+
+#   facet_wrap(~carbonSource)+
+#   xlab('Time (hr)') +ylab("Growth (OD600)")+ xlim(0,49)+ylim(-0.005,0.15)+
+#   scale_colour_manual(values =c('grey','dodgerblue2','green2','black'),breaks=c("Day0Anc","Day20T4","nuoL","blank"),labels=c("Ancestor","TOB*",expression(paste(italic('nuoL'),' mutant')),"Negative Control")) + 
+#   scale_fill_manual(values = c('grey85','lightblue2','palegreen1','grey50'),breaks=c("Day0Anc","Day20T4","nuoL","blank")) +theme_bw()+theme(legend.title = element_blank(), legend.text.align = 0, legend.text=element_text(size=8),strip.background = element_rect(fill='white'))
 
 Fig3C <- S4_fig_growth %>% 
   ggplot(aes(timeTidy, AUC))+
@@ -1871,13 +2002,16 @@ resAncCipLagPhase <- wilcox.test(t_mid ~ strain, data = AncCip, exact = FALSE)
 # resAncCipLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncCip, exact = FALSE)
 
 # Figure 4 Max Growth Stats
-AncTobStar <- growthDatGlcNAcMaximums %>% filter(strain == 'Day0Anc'|strain =='Day20T4')
-AncTobStar$strain <- factor(AncTobStar$strain, levels = rev(unique(AncTobStar$strain)), ordered = TRUE)
-resAncTobStarMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncTobStar, exact = FALSE)
 
-AncNuoL <- growthDatGlcNAcMaximums %>% filter(strain == 'Day0Anc'|strain =='nuoL')
-AncNuoL$strain <- factor(AncNuoL$strain, levels = rev(unique(AncNuoL$strain)), ordered = TRUE)
-resAncNuoLMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncNuoL, exact = FALSE)
+
+# Figure 4 old stats
+# AncTobStar <- growthDatGlcNAcMaximums %>% filter(strain == 'Day0Anc'|strain =='Day20T4')
+# AncTobStar$strain <- factor(AncTobStar$strain, levels = rev(unique(AncTobStar$strain)), ordered = TRUE)
+# resAncTobStarMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncTobStar, exact = FALSE)
+# 
+# AncNuoL <- growthDatGlcNAcMaximums %>% filter(strain == 'Day0Anc'|strain =='nuoL')
+# AncNuoL$strain <- factor(AncNuoL$strain, levels = rev(unique(AncNuoL$strain)), ordered = TRUE)
+# resAncNuoLMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncNuoL, exact = FALSE)
 
 # Figure 6C
 AncPip_6C <- ancP1gnyAMaximums %>% filter(strain == 'Day0Anc'|strain == 'Day20P1')
@@ -1988,8 +2122,8 @@ Maximum Growth (OD600)
 Ancestor vs TOB-R4
 Ancestor vs *nuoL*
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
-p4 <- c(resAncTobStarMaxGrowth$p.value, resAncNuoLMaxGrowth$p.value)
-p4
+# p4 <- c(resAncTobStarMaxGrowth$p.value, resAncNuoLMaxGrowth$p.value)
+# p4
 ```
 
 Figure 6C Statistics
@@ -2201,87 +2335,109 @@ strain_dist_mat <- as.matrix(strain_dist)
 ```
 
 
-```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
-# Experimenting with growthcurver instead of my code...
-# t_mid -> inflection point...point where we reach half the maximum density
-# r -> growth rate
-# t_gen -> doubling time (h)
+```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=6, width=5}
+# Remake Figure 4 with new data
 
-biologAllGrowthCurves <- biologAllStats %>% ungroup()%>% select(-medianOD600,-IQ25, -IQ75,-plate) %>% mutate(AUCmedian_abs = abs(AUCmedian)) %>% select(-AUCmedian)
+# Data for Figure 4A (Anc, LBE 1-4, TOB 1-4)
+Fig4ADat_raw_1 <- read_csv('growthDataNAG_1.csv')
+Fig4ADat_raw_2 <- read_csv('growthDataNAG_2.csv')
+Fig4ADat_raw <- rbind(Fig4ADat_raw_1, Fig4ADat_raw_2)
 
-AncestorAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day0Anc')
-AncDat <- AncestorAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
-gc_out_Anc <- SummarizeGrowthByPlate(AncDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_anc.pdf", bg_correct = 'none')%>% mutate(strain = 'Day0Anc')
-
-tobAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20T3')
-tobDat <- tobAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
-gc_out_tob <- SummarizeGrowthByPlate(tobDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_tob.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20T3')
-
-pipAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20P1')
-pipDat <- pipAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
-gc_out_pip <- SummarizeGrowthByPlate(pipDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_pip.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20P1')
-
-cipAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20F4')
-cipDat <- cipAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
-gc_out_cip <- SummarizeGrowthByPlate(cipDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_cip.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20F4')
-
-lbeAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20C2')
-lbeDat <- lbeAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
-gc_out_lbe <- SummarizeGrowthByPlate(lbeDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_lbe.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20C2')
-
-# Data frame of all the growth dynamics data for all strains on all carbon sources
-# Use t_mid for the time it takes to reach 1/2 the max OD
-growthDynamics <- bind_rows(gc_out_Anc,gc_out_tob,gc_out_cip,gc_out_pip,gc_out_lbe)
-growthDynamics <- growthDynamics %>% mutate(carbonSource = sample) %>% select(-sample)
-
-# Remake Figure 3B,C,E,F with these newly calculated doubling times and time to half carrying capacity (half theoretical max OD600)
-# Load descriptors for these carbon sources 
-growthDynamics <- inner_join(growthDynamics,Fig3_CarbonSourceDescriptors)
-growthDynamics <- growthDynamics %>% arrange(description)
-growthDynamics$carbonSource <- factor(growthDynamics$carbonSource, levels = rev(unique(growthDynamics$carbonSource)),ordered = TRUE)
-
-# Figure 3B - Doubling Time
-Fig3B <- growthDynamics %>% 
-  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
-  ggplot(aes(x=strain, y=carbonSource)) +
-  geom_tile(aes(fill = t_gen), color='white')+
-  xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Doubling Time \n (hr)',label.hjust=0.6))+
-  scale_fill_gradient(low = "grey95", high = "black", trans='log10', limits=c(.1, 30))+
-  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
-        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
-
-# Figure 3C
-Fig3C <- growthDynamics %>% 
-  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
-  ggplot(aes(x=strain, y=carbonSource)) +
-  geom_tile(aes(fill = t_mid), color='white')+
-  xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time to 1/2 K \n (hr)'))+
-  scale_fill_gradient(low = "grey95", high = "black", trans='log10')+
-  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
-        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
-
-# Figure 3E - Doubling Time
-Fig3E <- growthDynamics %>% 
-  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
-  ggplot(aes(x=strain, y = t_gen))+
-  geom_boxplot(aes(color = strain), size=1.25)+
-  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+scale_y_log10(limits=c(0.1,30))+
-  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Doubling Time (hr)')
-
-# Figure 3F
-Fig3F <- growthDynamics %>% 
-  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
-  ggplot(aes(x=strain, y = t_mid))+
-  geom_boxplot(aes(color = strain), size=1.25)+
-  #geom_signif(comparisons=list(c("Day0Anc","Day20P1"), c("Day0Anc","Day20F4")), annotations = c('***','**'), tip_length = 0, y_position = c(1.95, 1.75))+
-  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+ scale_y_log10() + 
-  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab("Time to 1/2 Carrying Capacity (hr)")
+# Data for Figure 4B (Anc, 8 transposon mutants)
+Fig4BDat_raw_1 <- read_csv('growthDataNAG_3.csv')
+Fig4BDat_raw_2 <- read_csv('growthDataNAG_4.csv')
+Fig4B_key <- read_csv('NAG_mutants_key.csv')
+Fig4BDat_raw <- rbind(Fig4BDat_raw_1, Fig4BDat_raw_2)
+Fig4BDat_raw <- inner_join(Fig4BDat_raw, Fig4B_key)
 
 
-# Remake Figure S8 with newly calculated growth dynamics 
 
+Fig4ADat <- Fig4ADat_raw %>% group_by(strain, wellID,media,timeTidy) %>% summarise(OD600 = median(data)) %>% filter(media == 'N-Acetyl-D-Glucosamine')
+
+Fig4BDat <- Fig4BDat_raw %>% group_by(strain, wellID,media,timeTidy) %>% summarise(OD600 = median(data)) %>% filter(media == 'N-Acetyl-D-Glucosamine')
+
+# Calculate the distribution of optical maximum densities:
+     # 1. Subtract the minimum OD600 from each isolate curve from the entire curve
+Fig4AMinimums <- Fig4ADat %>% ungroup() %>% group_by(strain, wellID, media) %>% filter(media == 'N-Acetyl-D-Glucosamine') %>% summarise(minOD600 = min(OD600))
+     Fig4AMinimums <- do.call("rbind", replicate(272, Fig4AMinimums, simplify = FALSE))
+     Fig4AMinimums <- Fig4AMinimums %>% arrange(wellID)
+     Fig4ADat$minSubtractedOD600 <- Fig4ADat$OD600 - Fig4AMinimums$minOD600
+     
+Fig4BMinimums <- Fig4BDat %>% ungroup() %>% group_by(strain, wellID, media) %>% filter(media == 'N-Acetyl-D-Glucosamine') %>% summarise(minOD600 = min(OD600))
+     Fig4BMinimums <- do.call("rbind", replicate(272, Fig4BMinimums, simplify = FALSE))
+     Fig4BMinimums <- Fig4BMinimums %>% arrange(wellID)
+     Fig4BDat$minSubtractedOD600 <- Fig4BDat$OD600 - Fig4BMinimums$minOD600
+     
+     # 2. Take the maximum of each min-subtracted isolate curve (stats calculated from this)
+     Fig4AMaximums <- Fig4ADat %>% ungroup() %>% group_by(strain, wellID, media) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(strain != 'blank')
+     
+     Fig4BMaximums <- Fig4BDat %>% ungroup() %>% group_by(strain, wellID, media) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(strain != 'blank')
+     
+     # 3. Calculate median and IQR of each strain (used for plotting Fig 4)
+     Fig4ADistribution <- Fig4AMaximums %>% 
+       ungroup() %>% group_by(strain, media) %>% summarise(medianMaxOD600 = median(maxOD600), IQ25 = quantile(maxOD600, 1/4), IQ75 = quantile(maxOD600, 3/4))
+     Fig4AMaximums$strain <- factor(Fig4AMaximums$strain, levels =c('Day0Anc','Day20C1','Day20C2','Day20C3','Day20C4','Day20T1','Day20T2','Day20T3','Day20T4'))
+     
+       Fig4BDistribution <- Fig4BMaximums %>% 
+       ungroup() %>% group_by(strain, media) %>% summarise(medianMaxOD600 = median(maxOD600), IQ25 = quantile(maxOD600, 1/4), IQ75 = quantile(maxOD600, 3/4))
+     Fig4BMaximums$strain <- factor(Fig4BMaximums$strain, levels = c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))     
+
+# Generate a new Figure 4
+  Figure4AJitter <- Fig4AMaximums %>% group_by(strain) %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+  # geom_point(aes(color = strain))+
+  # geom_dotplot(aes(fill = strain),
+  #              binaxis = "y",
+  #              stackdir = "center")+
+ stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 1)+
+  # geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
+  facet_wrap(~media)+
+  ylab("Max Growth (OD600)")+ylim(0,0.20)+
+  scale_color_manual(values =c('grey','black','black','black','black', 'dodgerblue2','dodgerblue2','dodgerblue2','dodgerblue2'),breaks=c("Day0Anc","Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3","Day20T4"),labels=c("Ancestor","LBE 1","LBE 2","LBE 3","LBE 4","TOB 1","TOB 2","TOB 3","TOB 4"))+
+theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3","Day20T4"),labels=c("Ancestor","LBE 1","LBE 2","LBE 3","LBE 4","TOB 1","TOB 2","TOB 3","TOB 4"))
+  
+  Figure4BJitter <- Fig4BMaximums %>% group_by(strain) %>% 
+  ggplot(aes(strain, maxOD600))+
+  geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
+  # geom_point(aes(color = strain))+
+  # geom_dotplot(aes(fill = strain),
+  #              binaxis = "y",
+  #              stackdir = "center")+
+ stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                 geom = "crossbar", width = 0.2)+
+  geom_errorbar(stat = "summary",
+                  fun.ymin = function(z) {quantile(z,0.25)},
+                  fun.ymax = function(z) {quantile(z,0.75)},
+                  fun.y = median,
+                width = 0.1, size = 1)+
+  # geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
+  facet_wrap(~media)+
+  ylab("Max Growth (OD600)")+ylim(0,0.20)+
+  scale_color_manual(values =c('grey','green2','green2','green2','green2', 'green2','green2','green2','green2'),breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))+
+theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
+  scale_x_discrete(breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))
+ 
+# Arrange Figure 4
+  Fig4 <- arrangeGrob(Figure4AJitter, Figure4BJitter, ncol=1, nrow =2, heights=c(3,3),layout_matrix=cbind(c(1,2)))
+
+ Figure4 <- as_ggplot(Fig4) +                                # transform to a ggplot
+  draw_plot_label(label = c("A","B"), size = 15,
+                  x = c(0,0), y = c(1,0.5))
+ Figure4
+ 
+
+  ggsave('Figures and Data/Fig4.tiff',Figure4,dpi=300)
+
+   
+     
 ```
 
 
