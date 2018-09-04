@@ -33,6 +33,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # install.packages('png')
 # install.packages('vegan')
 # install.packages('devtools')
+# install.packages('growthcurver')
 # devtools::install_github("andrie/ggdendro")
 
 ```
@@ -59,6 +60,7 @@ library(png)
 library(vegan)
 library(ggdendro)
 library(scales)
+library(growthcurver)
 
 ```
 Major changes:
@@ -71,10 +73,7 @@ biologDataPM1<- read_csv("biologDataPM1.csv")
 biologDataPM2<- read_csv("biologDataPM2.csv")
 ```
 
-```{r, warning=FALSE,message=FALSE, echo=FALSE, results=FALSE}
-# Load calculated growth rates, maxLnOD and lag times generated in MATLAB:
-biologGrowthDynamics <- read_csv("biologGrowthDynamics.csv")
-```
+
 
 ```{r, warning=FALSE,message=FALSE, echo=FALSE, results=FALSE}
 ### Load Data Headings
@@ -104,21 +103,21 @@ biologAllStats <- biologAllTidy %>%
   group_by(strain, plate, timePoint, carbonSource) %>% 
   summarize(medianOD600 = median(OD600), IQ25 = quantile(OD600, 1/4), IQ75 = quantile(OD600, 3/4)) # added median and IQR
 
-# Calculate the Maximum Growth from individual growth curves (see methods)
+# Calculate the Maximum Growth from individual growth curves (see methods) (CHANGING THIS TO JUST MAX OF AUC_median)
      # 1. Subtract the minimum OD600 from each isolate curve from the entire curve
-     biologMinimumSubtracted <- biologAllTidy %>% ungroup() %>% group_by(expID, strain, plate,carbonSource) %>% mutate(minOD600 = min(OD600), minSubtractedOD600 = OD600 - minOD600)
-     
-     # 2. Take the maximum of each min-subtracted isolate curve (stats calculated from this)
-     biologMaximums <- biologMinimumSubtracted %>% ungroup() %>% group_by(expID, strain, plate, carbonSource) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(carbonSource != 'Negative Control 1', carbonSource != 'Negative Control 2')
-    
-     # 3. Calculate median and IQR of each strain (used for Fig 2-3, S3 Data, growth dynamics)
-     biologMedianMaxOD600 <- biologMaximums %>% 
-       ungroup() %>% group_by(strain, plate, carbonSource) %>% summarise(medianMaxOD600 = median(maxOD600))
-
-# Compile and take the median of the growth dynamics (across three biological replicates)
-biologGrowthDynamicsStats <- biologGrowthDynamics %>% 
-  group_by(plate,strain, carbonSource) %>% 
-  summarise(medianGrowthRate = median(growthRate), medianLagPhase = median(lagPhase))
+     # biologMinimumSubtracted <- biologAllTidy %>% ungroup() %>% group_by(expID, strain, plate,carbonSource) %>% mutate(minOD600 = min(OD600), minSubtractedOD600 = OD600 - minOD600)
+     # 
+     # # 2. Take the maximum of each min-subtracted isolate curve (stats calculated from this)
+     # biologMaximums <- biologMinimumSubtracted %>% ungroup() %>% group_by(expID, strain, plate, carbonSource) %>% summarise(maxOD600 = max(minSubtractedOD600)) %>% filter(carbonSource != 'Negative Control 1', carbonSource != 'Negative Control 2')
+     # 
+     # # 3. Calculate median and IQR of each strain (used for Fig 2-3, S3 Data, growth dynamics)
+     # biologMedianMaxOD600 <- biologMaximums %>% 
+     #   ungroup() %>% group_by(strain, plate, carbonSource) %>% summarise(medianMaxOD600 = median(maxOD600))
+# 
+# # Compile and take the median of the growth dynamics (across three biological replicates)
+# biologGrowthDynamicsStats <- biologGrowthDynamics %>% 
+#   group_by(plate,strain, carbonSource) %>% 
+#   summarise(medianGrowthRate = median(growthRate), medianLagPhase = median(lagPhase))
 
 # Calculating Growth/No Growth: Grab the negative controls
 NegControl <- biologAllStats %>% 
@@ -141,6 +140,51 @@ growthCutoff <- as.numeric(biologAllStats %>% group_by(strain, carbonSource) %>%
   ungroup() %>% summarise(cutoff = quantile(AUCsum,3/4)))
 ```
 
+```{r, warning=FALSE,message=FALSE, echo=FALSE, results=FALSE}
+# Calculate the growth dynamics for all median, negative control-subtracted growth curves
+# biologGrowthDynamics <- read_csv("biologGrowthDynamics.csv")
+# t_mid -> inflection point...point where we reach half the maximum density or carrying capacity
+# r -> growth rate
+# t_gen -> doubling time (h)
+
+biologAllGrowthCurves <- biologAllStats %>% ungroup()%>% select(-medianOD600,-IQ25, -IQ75,-plate) %>% mutate(AUCmedian_abs = abs(AUCmedian)) %>% select(-AUCmedian)
+
+AncestorAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day0Anc')
+AncDat <- AncestorAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_Anc <- SummarizeGrowthByPlate(AncDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_anc.pdf", bg_correct = 'none')%>% mutate(strain = 'Day0Anc')
+
+tobAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20T3')
+tobDat <- tobAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_tob <- SummarizeGrowthByPlate(tobDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_tob.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20T3')
+
+pipAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20P1')
+pipDat <- pipAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_pip <- SummarizeGrowthByPlate(pipDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_pip.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20P1')
+
+cipAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20F4')
+cipDat <- cipAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_cip <- SummarizeGrowthByPlate(cipDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_cip.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20F4')
+
+lbeAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20C2')
+lbeDat <- lbeAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_lbe <- SummarizeGrowthByPlate(lbeDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_lbe.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20C2')
+
+# Data frame of all the growth dynamics data for all strains on all carbon sources
+# Use t_mid for the time it takes to reach 1/2 the max OD
+growthDynamics <- bind_rows(gc_out_Anc,gc_out_tob,gc_out_cip,gc_out_pip,gc_out_lbe)
+growthDynamics <- growthDynamics %>% mutate(carbonSource = sample) %>% select(-sample)
+
+# Calculate maximum OD600 (max of the AUC_median)
+maxGrowths <- biologAllStats %>%
+  group_by(strain,carbonSource) %>% 
+  mutate(AUCsum = sum(AUCmedian)) %>% #changed this to median
+  summarise(maxOD600=max(AUCmedian))
+
+# Merge all growth dynamics into one data frame
+allGrowthDynamics <- inner_join(growthDynamics, maxGrowths)
+
+```
+
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Filter the growth dynamics data (Figure 3)
 #Select only the carbon sources that support growth on all 5 strains:
@@ -157,15 +201,23 @@ biologAllGrowth <- biologAllStats %>%
   summarise(maxOD600=max(AUCmedian))
 
 #Join these carbon sources with growth dynamics (growth rate and lag phase) to filter down their data frames
-biologAllGrowthDynamics <- inner_join(biologAllGrowth, biologGrowthDynamicsStats)
-biologAllGrowthDynamics <- inner_join(biologAllGrowthDynamics, biologMedianMaxOD600)
+growthDynamics_Fig3 <- inner_join(allGrowthDynamics, biologAllGrowth)
+# biologAllGrowthDynamics <- inner_join(biologAllGrowth, biologGrowthDynamicsStats)
+# biologAllGrowthDynamics <- inner_join(biologAllGrowthDynamics, biologMedianMaxOD600)
 # biologAllGrowthDynamics$carbonSource <- factor(biologAllGrowthDynamics$carbonSource, levels = rev(unique(biologAllGrowthDynamics$carbonSource)),ordered = TRUE)
 
-# Load descriptors for these carbon sources 
+# # Load descriptors for these carbon sources 
+# Fig3_CarbonSourceDescriptors <- read_csv('carbonSourceDescriptors.csv')
+# biologAllGrowthDynamics <- inner_join(biologAllGrowthDynamics,Fig3_CarbonSourceDescriptors)
+# biologAllGrowthDynamics <- biologAllGrowthDynamics %>% arrange(description)
+# biologAllGrowthDynamics$carbonSource <- factor(biologAllGrowthDynamics$carbonSource, levels = rev(unique(biologAllGrowthDynamics$carbonSource)),ordered = TRUE)
+
+# Join carbon sources for figure 3 with growth dynamics and add descriptors
 Fig3_CarbonSourceDescriptors <- read_csv('carbonSourceDescriptors.csv')
-biologAllGrowthDynamics <- inner_join(biologAllGrowthDynamics,Fig3_CarbonSourceDescriptors)
-biologAllGrowthDynamics <- biologAllGrowthDynamics %>% arrange(description)
-biologAllGrowthDynamics$carbonSource <- factor(biologAllGrowthDynamics$carbonSource, levels = rev(unique(biologAllGrowthDynamics$carbonSource)),ordered = TRUE)
+growthDynamics_Fig3 <- inner_join(allGrowthDynamics, biologAllGrowth)
+growthDynamics_Fig3 <- inner_join(growthDynamics_Fig3,Fig3_CarbonSourceDescriptors)
+growthDynamics_Fig3 <- growthDynamics_Fig3 %>% arrange(description)
+growthDynamics_Fig3$carbonSource <- factor(growthDynamics_Fig3$carbonSource, levels = rev(unique(growthDynamics_Fig3$carbonSource)),ordered = TRUE)
 ```
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
@@ -525,13 +577,13 @@ Fig2CDat <-biologAllStats %>%
   ungroup() %>% group_by(strain,carbonSource) %>% 
   filter(sum(AUCmedian)>=growthCutoff) %>% 
   summarize(maxOD600 = max(AUCmedian))
-Fig2CDat <- inner_join(Fig2CDat, biologMedianMaxOD600)
+# Fig2CDat <- inner_join(Fig2CDat, biologMedianMaxOD600)
 
 # Figure 2C New
 Fig2C <- Fig2CDat %>% 
-  ggplot(aes(x=strain, y = medianMaxOD600))+
+  ggplot(aes(x=strain, y = maxOD600))+
   geom_boxplot(size=1.25, aes(color = strain))+
-  geom_signif(comparisons=list(c("Day0Anc", "Day20C2"), c("Day0Anc","Day20F4"), c("Day0Anc","Day20P1"),c("Day0Anc","Day20T3")), annotations=c("*","***","***","***"), tip_length = 0, y_position = c(0.65, 0.72, 0.79,0.86))+
+  geom_signif(comparisons=list(c("Day0Anc", "Day20C2"), c("Day0Anc","Day20F4"), c("Day0Anc","Day20P1"),c("Day0Anc","Day20T3")), annotations=c("***","***","***","**"), tip_length = 0, y_position = c(0.65, 0.72, 0.79,0.86))+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
   theme_bw()+ ylim(0,0.90)+
    scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
@@ -604,12 +656,29 @@ Figure2
 #   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
 #         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
 
-# New Fig 3A
-Fig3A <- biologAllGrowthDynamics %>% 
+# New Fig 3A (maxOD600)
+Fig3A <- growthDynamics_Fig3 %>% 
   ggplot(aes(x=strain, y=carbonSource)) +
-  geom_tile(aes(fill = medianMaxOD600), color='white')+
+  geom_tile(aes(fill = maxOD600), color='white')+
   xlab("")+ylab("")+theme_bw() +theme(axis.text.y = element_text(size=10), axis.text.x = element_text(angle = 45, hjust = 1), legend.position="top", legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Max Growth \n (OD600)'))+
   scale_fill_gradient(low = "grey95", high = "black")+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+Fig3B <- growthDynamics_Fig3 %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = t_gen), color='white')+
+  xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Doubling Time \n (hr)',label.hjust=0.6))+
+  scale_fill_gradient(low = "grey95", high = "black", trans='log10', limits=c(.1, 30))+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 3C
+Fig3C <- growthDynamics_Fig3 %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = t_mid), color='white')+
+  xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time Mid-Exponential (hr)'))+
+  scale_fill_gradient(low = "grey95", high = "black", trans='log10')+
   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
 
@@ -622,33 +691,51 @@ Fig3A <- biologAllGrowthDynamics %>%
 #   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
 #         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
 
-# Figure 3B - Doubling Time
-Fig3B <- biologAllGrowthDynamics %>% 
-  mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% 
-  ggplot(aes(x=strain, y=carbonSource)) +
-  geom_tile(aes(fill = medianDoublingTime), color='white')+
-  xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Doubling Time \n (hr)',label.hjust=0.6))+
-  scale_fill_gradient(low = "grey95", high = "black", trans='log10', limits=c(1, 30))+
-  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
-        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+# # Figure 3B - Doubling Time
+# Fig3B <- biologAllGrowthDynamics %>% 
+#   mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% 
+#   ggplot(aes(x=strain, y=carbonSource)) +
+#   geom_tile(aes(fill = medianDoublingTime), color='white')+
+#   xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Doubling Time \n (hr)',label.hjust=0.6))+
+#   scale_fill_gradient(low = "grey95", high = "black", trans='log10', limits=c(1, 30))+
+#   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+#         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+# 
+# # Figure 3C
+# Fig3C <- biologAllGrowthDynamics %>% 
+#   ggplot(aes(x=strain, y=carbonSource)) +
+#   geom_tile(aes(fill = medianLagPhase), color='white')+
+#   xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time to Mid-Exp \n (hr)'))+
+#   scale_fill_gradient(low = "grey95", high = "black", trans='log10')+
+#   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+#         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
 
-# Figure 3C
-Fig3C <- biologAllGrowthDynamics %>% 
-  ggplot(aes(x=strain, y=carbonSource)) +
-  geom_tile(aes(fill = medianLagPhase), color='white')+
-  xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time to Mid-Exp \n (hr)'))+
-  scale_fill_gradient(low = "grey95", high = "black", trans='log10')+
-  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
-        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
-
-# New 3D (medianMaxOD600)
-Fig3D <- biologAllGrowthDynamics %>% 
-  ggplot(aes(x=strain, y = medianMaxOD600))+
+# New 3D (maxOD600 new growth calc)
+Fig3D <- growthDynamics_Fig3 %>% 
+  ggplot(aes(x=strain, y = maxOD600))+
   geom_boxplot(aes(color = strain), size=1.25) + 
-  geom_signif(comparisons=list(c("Day0Anc", "Day20C2"), c("Day0Anc", "Day20F4"), c("Day0Anc","Day20P1")), annotations=c("**", "**","**"), tip_length = 0, y_position = c(0.52, 0.565,0.610))+
+  geom_signif(comparisons=list(c("Day0Anc", "Day20C2"), c("Day0Anc", "Day20F4"), c("Day0Anc","Day20P1")), annotations=c("**", "*","**"), tip_length = 0, y_position = c(0.52, 0.565,0.610))+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+
   theme_bw()+
   theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="bottom",legend.title=element_blank(), axis.text.x = element_blank())+xlab("")+ylim(0,0.62)+ylab('Max Growth (OD600)')
+
+# Figure 3E - Doubling Time
+Fig3E <- growthDynamics_Fig3 %>% 
+  ggplot(aes(x=strain, y = t_gen))+
+  geom_boxplot(aes(color = strain), size=1.25)+
+  geom_signif(comparisons=list(c("Day0Anc", "Day20F4")), annotations=c("***"), tip_length = 0, y_position = c(1.42))+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+  theme_bw()+scale_y_log10(limits=c(0.1,30))+
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Doubling Time (hr)')
+
+# Figure 3F
+Fig3F <- growthDynamics_Fig3 %>% 
+  ggplot(aes(x=strain, y = t_mid))+
+  geom_boxplot(aes(color = strain), size=1.25)+
+  geom_signif(comparisons=list(c("Day0Anc","Day20F4"), c("Day0Anc","Day20P1")), annotations = c('***','**'), tip_length = 0, y_position = c(2.8, 3))+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+  theme_bw()+ scale_y_log10(limits=c(NA, 1200)) + 
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab("Time Mid-Exponential (hr)")
 
 # Figure 3E - Growth Rate
 # Fig3E_GR <- biologAllGrowthDynamics %>%
@@ -660,22 +747,22 @@ Fig3D <- biologAllGrowthDynamics %>%
 #   theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Growth Rate (ln(OD600)/hr)')+ylim(0,0.525)
 
 # Figure 3E - Doubling Time
-Fig3E <- biologAllGrowthDynamics %>% 
-  mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% 
-  ggplot(aes(x=strain, y = medianDoublingTime))+
-  geom_boxplot(aes(color = strain), size=1.25)+
-  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+scale_y_log10(limits=c(1,30))+
-  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Doubling Time (hr)')
-
-# Figure 3F
-Fig3F <- biologAllGrowthDynamics %>% 
-  ggplot(aes(x=strain, y = medianLagPhase))+
-  geom_boxplot(aes(color = strain), size=1.25)+
-  geom_signif(comparisons=list(c("Day0Anc","Day20P1"), c("Day0Anc","Day20F4")), annotations = c('***','**'), tip_length = 0, y_position = c(1.95, 1.75))+
-  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+ scale_y_log10(limits=c(NA,100)) + 
-  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab("Time to Mid-Exponential (hr)")
+# Fig3E <- biologAllGrowthDynamics %>% 
+#   mutate(medianDoublingTime = log(2)/medianGrowthRate) %>% 
+#   ggplot(aes(x=strain, y = medianDoublingTime))+
+#   geom_boxplot(aes(color = strain), size=1.25)+
+#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+#   theme_bw()+scale_y_log10(limits=c(1,30))+
+#   theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Doubling Time (hr)')
+# 
+# # Figure 3F
+# Fig3F <- biologAllGrowthDynamics %>% 
+#   ggplot(aes(x=strain, y = medianLagPhase))+
+#   geom_boxplot(aes(color = strain), size=1.25)+
+#   geom_signif(comparisons=list(c("Day0Anc","Day20P1"), c("Day0Anc","Day20F4")), annotations = c('***','**'), tip_length = 0, y_position = c(1.95, 1.75))+
+#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+#   theme_bw()+ scale_y_log10(limits=c(NA,100)) + 
+#   theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab("Time to Mid-Exponential (hr)")
 
 legend_3DEF <- get_legend(Fig3D)
 
@@ -704,7 +791,7 @@ legend_3DEF <- get_legend(Fig3D)
 
  
  # Labels for each row in Figures 3A-C
- carbonSourceLabels <- biologAllGrowthDynamics %>%
+ carbonSourceLabels <- growthDynamics_Fig3 %>%
    ungroup() %>% 
    select(carbonSource) %>% 
    unique() %>% 
@@ -882,7 +969,7 @@ Fig6D <- ancP1scoABMaximums %>% group_by(strain) %>%
                   fun.ymax = function(z) {quantile(z,0.75)},
                   fun.y = median,
                 width = 0.1, size = 1)+
-  geom_signif(comparisons=list(c("Day0Anc", "Day20P1")), annotations=c("*"), tip_length = 0, y_position = c(0.375))+
+  #geom_signif(comparisons=list(c("Day0Anc", "Day20P1")), annotations=c("*"), tip_length = 0, y_position = c(0.375))+
   facet_wrap(~media)+
   scale_y_continuous(limits = c(-0.01,0.4))+
   scale_color_manual(values=c('grey','red','goldenrod1','darkorange1'), breaks = c("Day0Anc","Day20P1","scoA","scoB"), labels=c('Ancestor','PIP',expression(paste(italic('scoA'),' mutant')), expression(paste(italic('scoB'),' mutant'))))+
@@ -1095,9 +1182,12 @@ write_csv(Data_S2,'Figures and Data/S2_Data.csv')
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 # S3 Data - adjusted for median
-S3Data <- biologAllGrowthDynamics %>% select(-maxOD600)
-write_csv(S3Data,'Figures and Data/S3_Data.csv')
+# S3Data <- biologAllGrowthDynamics %>% select(-maxOD600)
+# write_csv(S3Data,'Figures and Data/S3_Data.csv')
 
+# NEW! Now also has all data and not just for curves with growth
+S3Data <- allGrowthDynamics %>% select(-auc_e, -auc_l)
+write_csv(S3Data,'Figures and Data/S3_Data.csv')
 ```
 
 
@@ -1429,34 +1519,22 @@ FigureS8DatAll <- biologAllStats %>%
   summarize(maxOD600 = max(AUCmedian), AUCsum = sum(AUCmedian)) %>%
   ungroup() 
 
-# Old
-# FigureS8Dat <- FigureS8DatAll %>% 
-#   select(-strain, -carbonSource)
-# pearsonCor <- cor(FigureS8Dat, method = 'pearson')
-# labelsCor <- data.frame(x = 70, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
-# 
 
-# New
-FigureS8DatAll <- inner_join(FigureS8DatAll, biologMedianMaxOD600)
-FigureS8Dat <- FigureS8DatAll %>% select(-maxOD600, -carbonSource,-strain, -plate)
+FigureS8Dat <- FigureS8DatAll %>%
+  select(-strain, -carbonSource)
 pearsonCor <- cor(FigureS8Dat, method = 'pearson')
 labelsCor <- data.frame(x = 70, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+# 
+
+# # New maxOD600 vs AUC
+# FigureS8DatAll <- inner_join(FigureS8DatAll, biologMedianMaxOD600)
+# FigureS8Dat <- FigureS8DatAll %>% select(-maxOD600, -carbonSource,-strain, -plate)
+# pearsonCor <- cor(FigureS8Dat, method = 'pearson')
+# labelsCor <- data.frame(x = 70, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
 
 # # Plot Correlation Old
-# FigureS8 <- FigureS8DatAll %>% 
-#   ggplot(aes(x=AUCsum, y = maxOD600))+
-#   geom_point(size=1.25, aes(color = strain))+
-#   geom_vline(xintercept=c(growthCutoff), linetype="dotted", size=1.25)+
-#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"), labels = c('Ancestor','LBE', 'CIP','PIP','TOB'))+
-#   theme_bw()+ theme(legend.title = element_blank())+
-#   xlab("Area Under the Curve \n (AUC)")+ylab('Max Growth (OD600)')+
-#   geom_text(data = labelsCor, aes(x = x, y = y,
-#                         label = label), parse = TRUE)
-# FigureS8
-
-# Plot correlation New
-FigureS8 <- FigureS8DatAll %>% 
-  ggplot(aes(x=AUCsum, y = medianMaxOD600))+
+FigureS8 <- FigureS8DatAll %>%
+  ggplot(aes(x=AUCsum, y = maxOD600))+
   geom_point(size=1.25, aes(color = strain))+
   geom_vline(xintercept=c(growthCutoff), linetype="dotted", size=1.25)+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"), labels = c('Ancestor','LBE', 'CIP','PIP','TOB'))+
@@ -1464,6 +1542,17 @@ FigureS8 <- FigureS8DatAll %>%
   xlab("Area Under the Curve \n (AUC)")+ylab('Max Growth (OD600)')+
   geom_text(data = labelsCor, aes(x = x, y = y,
                         label = label), parse = TRUE)
+
+# Plot correlation New
+# FigureS8 <- FigureS8DatAll %>% 
+#   ggplot(aes(x=AUCsum, y = medianMaxOD600))+
+#   geom_point(size=1.25, aes(color = strain))+
+#   geom_vline(xintercept=c(growthCutoff), linetype="dotted", size=1.25)+
+#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"), labels = c('Ancestor','LBE', 'CIP','PIP','TOB'))+
+#   theme_bw()+ theme(legend.title = element_blank())+
+#   xlab("Area Under the Curve \n (AUC)")+ylab('Max Growth (OD600)')+
+#   geom_text(data = labelsCor, aes(x = x, y = y,
+#                         label = label), parse = TRUE)
 FigureS8
 ggsave('Figures and Data/S7_Fig.tiff', FigureS8,dpi=300,height = 3, width = 5, units='in')
 ```
@@ -1492,34 +1581,63 @@ biologAllGrowthFinal <- biologAllStats %>%
   summarise(maxOD600=max(AUCmedian))
 
 #Join these carbon sources with growth dynamics (growth rate and lag phase) to filter down their data frames
-biologAllGrowthDynamicsFinal <- inner_join(biologAllGrowthFinal, biologGrowthDynamicsStats)
-biologAllGrowthDynamicsFinal <- inner_join(biologAllGrowthDynamicsFinal, biologMedianMaxOD600)
-biologAllGrowthDynamicsFinal$carbonSource <- factor(biologAllGrowthDynamicsFinal$carbonSource, levels = rev(unique(biologAllGrowthDynamicsFinal$carbonSource)),ordered = TRUE)
+filteredGrowthDynamics <- allGrowthDynamics %>% filter(carbonSource %in% biologAllGrowthFinal$carbonSource)
+filteredGrowthDynamics$carbonSource <- factor(filteredGrowthDynamics$carbonSource, levels = rev(unique(filteredGrowthDynamics$carbonSource)),ordered = TRUE)
 
 # Plot final growth dynamics for each sensitivity range tried (new MaxOD600)
-maxOD_plot <- biologAllGrowthDynamicsFinal %>%
-  ggplot(aes(x=strain, y = medianMaxOD600))+
+maxOD_plot <- filteredGrowthDynamics %>%
+  ggplot(aes(x=strain, y = maxOD600))+
   geom_boxplot(aes(color = strain), size=1) +
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+
   theme_bw()+
   theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),axis.title.x=element_blank(),legend.position="bottom",legend.title=element_blank(), axis.text.x = element_blank(), title = element_text(size = 8))+ylim(0,0.575)+ylab('Max Growth (OD600)') + ggtitle(paste(sensitivityRange*100,'%'))
 
-GR_plot <- biologAllGrowthDynamicsFinal %>%
-  ggplot(aes(x=strain, y = medianGrowthRate))+
+GR_plot <- filteredGrowthDynamics %>%
+  ggplot(aes(x=strain, y = t_gen))+
   geom_boxplot(aes(color = strain), size=1)+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+
-  theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),legend.position="none", axis.text.x = element_blank(),axis.title.x=element_blank(), title = element_text(size = 8))+ylab('Growth Rate (ln(OD600)/hr)')+ylim(0,0.525)+
+  theme_bw()+scale_y_log10() +
+  theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),legend.position="none", axis.text.x = element_blank(),axis.title.x=element_blank(), title = element_text(size = 8))+ylab('Doubling Time (hr)')+
 ggtitle(paste(sensitivityRange*100,'%'))
 
 
-LP_plot <- biologAllGrowthDynamicsFinal %>%
-  ggplot(aes(x=strain, y = medianLagPhase))+
+LP_plot <- filteredGrowthDynamics %>%
+  ggplot(aes(x=strain, y = t_mid))+
   geom_boxplot(aes(color = strain), size=1)+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+ scale_y_log10(limits=c(NA,100)) +
-  theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),legend.position="none", axis.text.x = element_blank(),axis.title.x=element_blank(), title = element_text(size = 8))+ylab("Time to Mid-Exponential (hr)")+
+  theme_bw()+ scale_y_log10() +
+  theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),legend.position="none", axis.text.x = element_blank(),axis.title.x=element_blank(), title = element_text(size = 8))+ylab("Time to 1/2 Carrying Capacity (hr)")+
 ggtitle(paste(sensitivityRange*100,'%'))
+
+
+# biologAllGrowthDynamicsFinal <- inner_join(biologAllGrowthFinal, biologGrowthDynamicsStats)
+# biologAllGrowthDynamicsFinal <- inner_join(biologAllGrowthDynamicsFinal, biologMedianMaxOD600)
+# biologAllGrowthDynamicsFinal$carbonSource <- factor(biologAllGrowthDynamicsFinal$carbonSource, levels = rev(unique(biologAllGrowthDynamicsFinal$carbonSource)),ordered = TRUE)
+
+# # Plot final growth dynamics for each sensitivity range tried (new MaxOD600)
+# maxOD_plot <- biologAllGrowthDynamicsFinal %>%
+#   ggplot(aes(x=strain, y = medianMaxOD600))+
+#   geom_boxplot(aes(color = strain), size=1) +
+#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+
+#   theme_bw()+
+#   theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),axis.title.x=element_blank(),legend.position="bottom",legend.title=element_blank(), axis.text.x = element_blank(), title = element_text(size = 8))+ylim(0,0.575)+ylab('Max Growth (OD600)') + ggtitle(paste(sensitivityRange*100,'%'))
+# 
+# GR_plot <- biologAllGrowthDynamicsFinal %>%
+#   ggplot(aes(x=strain, y = medianGrowthRate))+
+#   geom_boxplot(aes(color = strain), size=1)+
+#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+#   theme_bw()+
+#   theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),legend.position="none", axis.text.x = element_blank(),axis.title.x=element_blank(), title = element_text(size = 8))+ylab('Growth Rate (ln(OD600)/hr)')+ylim(0,0.525)+
+# ggtitle(paste(sensitivityRange*100,'%'))
+# 
+# 
+# LP_plot <- biologAllGrowthDynamicsFinal %>%
+#   ggplot(aes(x=strain, y = medianLagPhase))+
+#   geom_boxplot(aes(color = strain), size=1)+
+#   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+#   theme_bw()+ scale_y_log10(limits=c(NA,100)) +
+#   theme(axis.text.y = element_text(size=6), axis.title.y=element_text(size=6),legend.position="none", axis.text.x = element_blank(),axis.title.x=element_blank(), title = element_text(size = 8))+ylab("Time to Mid-Exponential (hr)")+
+# ggtitle(paste(sensitivityRange*100,'%'))
 
 plotList[[count]] <-  maxOD_plot
 plotList[[count + 1]] <- GR_plot
@@ -1684,47 +1802,73 @@ S1_RawData <- S1_RawData %>% ungroup() %>%group_by(strain, carbonSource) %>% mut
 ### Supplementary Text: Statistical Tests ###
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE}
 #Statistical tests:
-# Figure 2C: Wilcox Rank Sum test for box plot
+# Figure 2C: Wilcox Rank Sum test for box plot - redo this with maxOD600!!! 8/28/18
 AncPip_2C <- Fig2CDat %>% filter(strain == 'Day0Anc' | strain == 'Day20P1')
 AncPip_2C$strain <-  factor(AncPip_2C$strain, levels = rev(unique(AncPip_2C$strain)),ordered=TRUE)
-resAncPipMaxGrowth_2C <- wilcox.test(medianMaxOD600 ~ strain, data = AncPip_2C, exact = FALSE)
+resAncPipMaxGrowth_2C <- wilcox.test(maxOD600 ~ strain, data = AncPip_2C, exact = FALSE)
 
 AncCip_2C <- Fig2CDat %>% filter(strain == 'Day0Anc' | strain == 'Day20F4')
 AncCip_2C$strain <-  factor(AncCip_2C$strain, levels = rev(unique(AncCip_2C$strain)),ordered=TRUE)
-resAncCipMaxGrowth_2C <- wilcox.test(medianMaxOD600 ~ strain, data = AncCip_2C, exact = FALSE)
+resAncCipMaxGrowth_2C <- wilcox.test(maxOD600 ~ strain, data = AncCip_2C, exact = FALSE)
 
 AncTob_2C <- Fig2CDat %>% filter(strain == 'Day0Anc' | strain == 'Day20T3')
 AncTob_2C$strain <-  factor(AncTob_2C$strain, levels = rev(unique(AncTob_2C$strain)),ordered=TRUE)
-resAncTobMaxGrowth_2C <- wilcox.test(medianMaxOD600 ~ strain, data = AncTob_2C, exact = FALSE)
+resAncTobMaxGrowth_2C <- wilcox.test(maxOD600 ~ strain, data = AncTob_2C, exact = FALSE)
 
 AncCtrl_2C <- Fig2CDat %>% filter(strain == 'Day0Anc' | strain == 'Day20C2')
 AncCtrl_2C$strain <-  factor(AncCtrl_2C$strain, levels = rev(unique(AncCtrl_2C$strain)),ordered=TRUE)
-resAncCtrlMaxGrowth_2C <- wilcox.test(medianMaxOD600 ~ strain, data = AncCtrl_2C, exact = FALSE)
+resAncCtrlMaxGrowth_2C <- wilcox.test(maxOD600 ~ strain, data = AncCtrl_2C, exact = FALSE)
 
-# Figure 3: Wilcox Rank Sum test for box plots. Significance level = 0.05
-AncPip <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20P1')
+# Figure 3: Wilcox Rank Sum test for box plots. Significance level = 0.05...need to redo
+# New: 9/4/18 with t_gen (DT) and t_mid (time to half carrying capacity)
+AncPip <- growthDynamics_Fig3 %>% filter(strain == 'Day0Anc' | strain =='Day20P1')
 AncPip$strain <-  factor(AncPip$strain, levels = rev(unique(AncPip$strain)),ordered=TRUE)
-resAncPipMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncPip, exact = FALSE)
-resAncPipGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncPip, exact = FALSE)
-resAncPipLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncPip, exact = FALSE)
+resAncPipMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncPip, exact = FALSE)
+resAncPipGrowthRate <- wilcox.test(t_gen ~ strain, data = AncPip, exact = FALSE)
+resAncPipLagPhase <- wilcox.test(t_mid ~ strain, data = AncPip, exact = FALSE)
 
-AncCtrl <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20C2')
+AncCtrl <- growthDynamics_Fig3 %>% filter(strain == 'Day0Anc' | strain =='Day20C2')
 AncCtrl$strain <-  factor(AncCtrl$strain, levels = rev(unique(AncCtrl$strain)),ordered=TRUE)
-resAncCtrlMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncCtrl, exact = FALSE)
-resAncCtrlGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncCtrl, exact = FALSE)
-resAncCtrlLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncCtrl, exact = FALSE)
+resAncCtrlMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncCtrl, exact = FALSE)
+resAncCtrlGrowthRate <- wilcox.test(t_gen ~ strain, data = AncCtrl, exact = FALSE)
+resAncCtrlLagPhase <- wilcox.test(t_mid ~ strain, data = AncCtrl, exact = FALSE)
 
-AncTob <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20T3')
+AncTob <- growthDynamics_Fig3 %>% filter(strain == 'Day0Anc' | strain =='Day20T3')
 AncTob$strain <-  factor(AncTob$strain, levels = rev(unique(AncTob$strain)),ordered=TRUE)
-resAncTobMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncTob, exact = FALSE)
-resAncTobGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncTob, exact = FALSE)
-resAncTobLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncTob, exact = FALSE)
+resAncTobMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncTob, exact = FALSE)
+resAncTobGrowthRate <- wilcox.test(t_gen ~ strain, data = AncTob, exact = FALSE)
+resAncTobLagPhase <- wilcox.test(t_mid ~ strain, data = AncTob, exact = FALSE)
 
-AncCip <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20F4')
+AncCip <- growthDynamics_Fig3 %>% filter(strain == 'Day0Anc' | strain =='Day20F4')
 AncCip$strain <-  factor(AncCip$strain, levels = rev(unique(AncCip$strain)),ordered=TRUE)
-resAncCipMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncCip, exact = FALSE)
-resAncCipGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncCip, exact = FALSE)
-resAncCipLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncCip, exact = FALSE)
+resAncCipMaxGrowth <- wilcox.test(maxOD600 ~ strain, data = AncCip, exact = FALSE)
+resAncCipGrowthRate <- wilcox.test(t_gen ~ strain, data = AncCip, exact = FALSE)
+resAncCipLagPhase <- wilcox.test(t_mid ~ strain, data = AncCip, exact = FALSE)
+
+# Old - my own calculation of growth dynamics 
+# AncPip <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20P1')
+# AncPip$strain <-  factor(AncPip$strain, levels = rev(unique(AncPip$strain)),ordered=TRUE)
+# resAncPipMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncPip, exact = FALSE)
+# resAncPipGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncPip, exact = FALSE)
+# resAncPipLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncPip, exact = FALSE)
+# 
+# AncCtrl <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20C2')
+# AncCtrl$strain <-  factor(AncCtrl$strain, levels = rev(unique(AncCtrl$strain)),ordered=TRUE)
+# resAncCtrlMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncCtrl, exact = FALSE)
+# resAncCtrlGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncCtrl, exact = FALSE)
+# resAncCtrlLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncCtrl, exact = FALSE)
+# 
+# AncTob <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20T3')
+# AncTob$strain <-  factor(AncTob$strain, levels = rev(unique(AncTob$strain)),ordered=TRUE)
+# resAncTobMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncTob, exact = FALSE)
+# resAncTobGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncTob, exact = FALSE)
+# resAncTobLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncTob, exact = FALSE)
+# 
+# AncCip <- biologAllGrowthDynamics %>% filter(strain == 'Day0Anc' | strain =='Day20F4')
+# AncCip$strain <-  factor(AncCip$strain, levels = rev(unique(AncCip$strain)),ordered=TRUE)
+# resAncCipMaxGrowth <- wilcox.test(medianMaxOD600 ~ strain, data = AncCip, exact = FALSE)
+# resAncCipGrowthRate <- wilcox.test(medianGrowthRate ~ strain, data = AncCip, exact = FALSE)
+# resAncCipLagPhase <- wilcox.test(medianLagPhase ~ strain, data = AncCip, exact = FALSE)
 
 # Figure 4 Max Growth Stats
 AncTobStar <- growthDatGlcNAcMaximums %>% filter(strain == 'Day0Anc'|strain =='Day20T4')
@@ -1791,6 +1935,9 @@ Maximum Growth (OD600):
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
 p2C <-  c(resAncCtrlMaxGrowth_2C$p.value,resAncCipMaxGrowth_2C$p.value,resAncPipMaxGrowth_2C$p.value,resAncTobMaxGrowth_2C$p.value)
 p2C
+# B-H correction for all pairwise comparisons
+p2C_multComp <- p.adjust(p2C, method = 'BH')
+p2C_multComp
 
 ```
 
@@ -1803,6 +1950,9 @@ Maximum Growth (OD600)
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
 p3D <-  c(resAncCtrlMaxGrowth$p.value, resAncCipMaxGrowth$p.value, resAncPipMaxGrowth$p.value,resAncTobMaxGrowth$p.value )
 p3D
+# B-H correction for all pairwise comparisons
+p3D_multComp <- p.adjust(p3D, method = 'BH')
+p3D_multComp
 ```
 
 Figure 3E Statistics
@@ -1814,6 +1964,9 @@ Growth Rate
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
 p3E <- c(resAncCtrlGrowthRate$p.value, resAncCipGrowthRate$p.value, resAncPipGrowthRate$p.value, resAncTobGrowthRate$p.value)
 p3E
+# B-H correction for all pairwise comparisons
+p3E_multComp <- p.adjust(p3E, method = 'BH')
+p3E_multComp
 ```
 
 Figure 3F Statistics
@@ -1825,6 +1978,9 @@ Time to Mid-Exponential Phase
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
 p3F <- c(resAncCtrlLagPhase$p.value, resAncCipLagPhase$p.value,resAncPipLagPhase$p.value,resAncTobLagPhase$p.value)
 p3F
+# B-H correction for all pairwise comparisons
+p3F_multComp <- p.adjust(p3F, method = 'BH')
+p3F_multComp
 ```
 
 Figure 4 Statistics
@@ -1843,6 +1999,9 @@ Ancestor vs *gnyA*
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
 p6C <- c(resAncPip_6C$p.value, resAncGnyA_6C$p.value)
 p6C
+# B-H correction for all pairwise comparisons
+p6C_multComp <- p.adjust(p6C, method = 'BH')
+p6C_multComp
 ```
 
 Figure 6D Statisitics 
@@ -1852,7 +2011,10 @@ Ancestor vs *scoA*
 Ancestor vs *scoB*
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
 p6D <- c(resAncPip_6D$p.value,resAncScoA_6D$p.value,resAncScoB_6D$p.value)
+# B-H correction for all pairwise comparisons
+p6D_multComp <- p.adjust(p6D, method = 'BH')
 p6D
+p6D_multComp
 ```
 
 Figure 7 Statisitics 
@@ -1871,60 +2033,61 @@ p7
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
 # Looking at the variability across replicates and the impact of using the median instead of the mean on our data
 
+
 # Raw data: Maximums
-biologMaximums %>%  ggplot(aes(carbonSource, maxOD600, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
-
-# Raw data: Growth rates
-biologGrowthDynamics %>% ggplot(aes(carbonSource, growthRate, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
-
-# Raw data: Lag phases
-biologGrowthDynamics %>% ggplot(aes(carbonSource, lagPhase, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
-
-# Median vs Mean Max OD600
-biologMedianMeanMaxOD600 <- biologMaximums %>% 
-       ungroup() %>% group_by(strain, plate, carbonSource) %>% summarise(medianMaxOD600 = median(maxOD600), meanMaxOD600 = mean(maxOD600), maxMaxOD600 = max(maxOD600), minMaxOD600 = min(maxOD600))
-biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600, meanMaxOD600)) + geom_point()
-biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600,maxMaxOD600)) + geom_point()
-biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600, minMaxOD600)) + geom_point()
-
-
-# Median vs Mean Growth Rate
-biologGrowthDynamicsStatsExtra <- biologGrowthDynamics %>% 
-  group_by(plate,strain, carbonSource) %>% 
-  summarise(medianGrowthRate = median(growthRate), medianLagPhase = median(lagPhase), meanGrowthRate = mean(growthRate), meanLagPhase = mean(lagPhase))
-
-biologGrowthDynamicsStatsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate)) + geom_point()
-
-# Median vs Mean Lag Phase
-biologGrowthDynamicsStatsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+ geom_point()
-
-# Only looking at curves where there was growth
-biologAllGrowthDynamicsExtra <- inner_join(biologAllGrowth, biologGrowthDynamicsStatsExtra)
-biologAllGrowthDynamicsExtra <- inner_join(biologAllGrowthDynamicsExtra, biologMedianMeanMaxOD600)
-
-# biologAllGrowthDynamicsExtra %>% ggplot(aes(medianMaxOD600, meanMaxOD600))+geom_point()
-# biologAllGrowthDynamicsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate))+geom_point()
-# biologAllGrowthDynamicsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+geom_point()
-
-
+# biologMaximums %>%  ggplot(aes(carbonSource, maxOD600, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
+# 
+# # Raw data: Growth rates
+# biologGrowthDynamics %>% ggplot(aes(carbonSource, growthRate, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
+# 
+# # Raw data: Lag phases
+# biologGrowthDynamics %>% ggplot(aes(carbonSource, lagPhase, color = carbonSource))+geom_line()+facet_wrap(~strain, 5,1)+theme(legend.position = 'none', axis.text.x = element_blank())+geom_point()
+# 
+# # Median vs Mean Max OD600
+# biologMedianMeanMaxOD600 <- biologMaximums %>% 
+#        ungroup() %>% group_by(strain, plate, carbonSource) %>% summarise(medianMaxOD600 = median(maxOD600), meanMaxOD600 = mean(maxOD600), maxMaxOD600 = max(maxOD600), minMaxOD600 = min(maxOD600))
+# biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600, meanMaxOD600)) + geom_point()
+# biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600,maxMaxOD600)) + geom_point()
+# biologMedianMeanMaxOD600 %>% ggplot(aes(medianMaxOD600, minMaxOD600)) + geom_point()
+# 
+# 
+# # Median vs Mean Growth Rate
+# biologGrowthDynamicsStatsExtra <- biologGrowthDynamics %>% 
+#   group_by(plate,strain, carbonSource) %>% 
+#   summarise(medianGrowthRate = median(growthRate), medianLagPhase = median(lagPhase), meanGrowthRate = mean(growthRate), meanLagPhase = mean(lagPhase))
+# 
+# biologGrowthDynamicsStatsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate)) + geom_point()
+# 
+# # Median vs Mean Lag Phase
+# biologGrowthDynamicsStatsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+ geom_point()
+# 
+# # Only looking at curves where there was growth
+# biologAllGrowthDynamicsExtra <- inner_join(biologAllGrowth, biologGrowthDynamicsStatsExtra)
+# biologAllGrowthDynamicsExtra <- inner_join(biologAllGrowthDynamicsExtra, biologMedianMeanMaxOD600)
+# 
+# # biologAllGrowthDynamicsExtra %>% ggplot(aes(medianMaxOD600, meanMaxOD600))+geom_point()
+# # biologAllGrowthDynamicsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate))+geom_point()
+# # biologAllGrowthDynamicsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+geom_point()
+# 
+# 
 # AUC using mean vs median
-biologAllStatsExtra <- biologAllTidy %>% 
-  group_by(strain, plate, timePoint, carbonSource) %>% 
+biologAllStatsExtra <- biologAllTidy %>%
+  group_by(strain, plate, timePoint, carbonSource) %>%
   summarize(medianOD600 = median(OD600), meanOD600 = mean(OD600)) # added median and IQR
 
 
 # Calculating Growth/No Growth: Grab the negative controls
-NegControl <- biologAllStatsExtra %>% 
-  ungroup() %>% group_by(plate,strain,timePoint,carbonSource) %>% 
+NegControl <- biologAllStatsExtra %>%
+  ungroup() %>% group_by(plate,strain,timePoint,carbonSource) %>%
   filter(carbonSource == 'Negative Control 1'|carbonSource == 'Negative Control 2')
 # Duplicate the negative controls at each timepoint 96 times and stack them...arrange in the same way as biologAllStats
-NegControl <- do.call("rbind", replicate(96, NegControl, simplify = FALSE)) %>% arrange(strain, plate, timePoint,carbonSource) 
+NegControl <- do.call("rbind", replicate(96, NegControl, simplify = FALSE)) %>% arrange(strain, plate, timePoint,carbonSource)
 
 # Calculate the Area under the curve. AUC>=75th percentile will be our official growth cutoff
 biologAllStatsExtra$AUCmedian <- biologAllStatsExtra$medianOD600 - NegControl$medianOD600 # median
 biologAllStatsExtra$AUCmean <- biologAllStatsExtra$meanOD600 - NegControl$meanOD600
-
-biologAllStatsExtra %>% group_by(plate, strain, carbonSource) %>% summarise(AUCsum_median = sum(AUCmedian), AUCsum_mean = sum(AUCmean)) %>% ggplot(aes(AUCsum_median, AUCsum_mean))+geom_point()+geom_vline(xintercept = growthCutoff)+geom_hline(yintercept = growthCutoff)
+# 
+# biologAllStatsExtra %>% group_by(plate, strain, carbonSource) %>% summarise(AUCsum_median = sum(AUCmedian), AUCsum_mean = sum(AUCmean)) %>% ggplot(aes(AUCsum_median, AUCsum_mean))+geom_point()+geom_vline(xintercept = growthCutoff)+geom_hline(yintercept = growthCutoff)
 
 # What I would like to give to the reviewers:
 AUC_comparison <- biologAllStatsExtra %>% group_by(plate, strain, carbonSource) %>% summarise(AUC_median = sum(AUCmedian), AUC_mean = sum(AUCmean)) %>% ungroup() %>% select(AUC_median, AUC_mean,-plate,-strain)
@@ -1933,39 +2096,39 @@ labelsCor <- data.frame(x = 70, y = 0.1, label = paste("italic(r)==", round(pear
 AUC_mean_median <- AUC_comparison %>% ggplot(aes(AUC_median, AUC_mean))+geom_point()+geom_text(data = labelsCor, aes(x = x, y = y,
                         label = label), parse = TRUE)
 AUC_mean_median
-
-biologAllStatsExtra %>% group_by(plate,strain,carbonSource) %>% summarise(aboveMean = sum(AUCmean)>growthCutoff, aboveMedian = sum(AUCmedian)>growthCutoff, diff = aboveMean != aboveMedian) %>% group_by(diff) %>% summarise(n())
-biologAllStatsExtra %>% group_by(plate,strain,carbonSource) %>% summarise(aboveMean = sum(AUCmean)>growthCutoff, aboveMedian = sum(AUCmedian)>growthCutoff, diff = aboveMean != aboveMedian, AUCsum_mean = sum(AUCmean), AUCsum_median = sum(AUCmedian)) %>% filter(diff == TRUE) %>% View()
-# 21 differences. 16 of these switch from Growth to No Growth
-
-
-# Growth rate/Lag phase/max growth from Fig 3 correlations 
-maxGrowthDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianMaxOD600, meanMaxOD600)
-pearsonCor <- cor(maxGrowthDat, method = 'pearson')
-labelsCorMaxGrowth <- data.frame(x = 0.4, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
-maxOD_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianMaxOD600, meanMaxOD600))+geom_point()+geom_text(data = labelsCorMaxGrowth, aes(x = x, y = y,
-                        label = label), parse = TRUE)
-maxOD_median_mean
-
-growthRateDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianGrowthRate, meanGrowthRate)
-pearsonCor <- cor(growthRateDat, method = 'pearson')
-labelsCorGR <- data.frame(x = 0.3, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
-GR_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate))+geom_point()+geom_text(data = labelsCorGR, aes(x = x, y = y,
-                        label = label), parse = TRUE)
-GR_median_mean
-
-lagPhaseDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianLagPhase, meanLagPhase)
-pearsonCor <- cor(lagPhaseDat, method = 'pearson')
-labelsCorLP <- data.frame(x = 20, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
-LP_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+geom_point()+geom_text(data = labelsCorLP, aes(x = x, y = y,
-                        label = label), parse = TRUE)
-LP_median_mean
-
-
+# 
+# biologAllStatsExtra %>% group_by(plate,strain,carbonSource) %>% summarise(aboveMean = sum(AUCmean)>growthCutoff, aboveMedian = sum(AUCmedian)>growthCutoff, diff = aboveMean != aboveMedian) %>% group_by(diff) %>% summarise(n())
+# biologAllStatsExtra %>% group_by(plate,strain,carbonSource) %>% summarise(aboveMean = sum(AUCmean)>growthCutoff, aboveMedian = sum(AUCmedian)>growthCutoff, diff = aboveMean != aboveMedian, AUCsum_mean = sum(AUCmean), AUCsum_median = sum(AUCmedian)) %>% filter(diff == TRUE) %>% View()
+# # 21 differences. 16 of these switch from Growth to No Growth
+# 
+# 
+# # Growth rate/Lag phase/max growth from Fig 3 correlations 
+# maxGrowthDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianMaxOD600, meanMaxOD600)
+# pearsonCor <- cor(maxGrowthDat, method = 'pearson')
+# labelsCorMaxGrowth <- data.frame(x = 0.4, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+# maxOD_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianMaxOD600, meanMaxOD600))+geom_point()+geom_text(data = labelsCorMaxGrowth, aes(x = x, y = y,
+#                         label = label), parse = TRUE)
+# maxOD_median_mean
+# 
+# growthRateDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianGrowthRate, meanGrowthRate)
+# pearsonCor <- cor(growthRateDat, method = 'pearson')
+# labelsCorGR <- data.frame(x = 0.3, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+# GR_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianGrowthRate, meanGrowthRate))+geom_point()+geom_text(data = labelsCorGR, aes(x = x, y = y,
+#                         label = label), parse = TRUE)
+# GR_median_mean
+# 
+# lagPhaseDat <- biologAllGrowthDynamicsExtra %>% ungroup() %>% select(medianLagPhase, meanLagPhase)
+# pearsonCor <- cor(lagPhaseDat, method = 'pearson')
+# labelsCorLP <- data.frame(x = 20, y = 0.1, label = paste("italic(r)==", round(pearsonCor[2],digits=3)))
+# LP_median_mean <- biologAllGrowthDynamicsExtra %>% ggplot(aes(medianLagPhase, meanLagPhase))+geom_point()+geom_text(data = labelsCorLP, aes(x = x, y = y,
+#                         label = label), parse = TRUE)
+# LP_median_mean
+# 
+# 
  ggsave('For Reviewers/AUC_median_mean.tiff', AUC_mean_median,dpi=300,height = 4, width = 4, units='in')
-  ggsave('For Reviewers/maxOD_median_mean.tiff', maxOD_median_mean,dpi=300,height = 4, width = 4, units='in')
- ggsave('For Reviewers/GR_median_mean.tiff', GR_median_mean,dpi=300,height = 4, width = 4, units='in')
- ggsave('For Reviewers/LP_median_mean.tiff', LP_median_mean,dpi=300,height = 4, width = 4, units='in')
+#   ggsave('For Reviewers/maxOD_median_mean.tiff', maxOD_median_mean,dpi=300,height = 4, width = 4, units='in')
+#  ggsave('For Reviewers/GR_median_mean.tiff', GR_median_mean,dpi=300,height = 4, width = 4, units='in')
+#  ggsave('For Reviewers/LP_median_mean.tiff', LP_median_mean,dpi=300,height = 4, width = 4, units='in')
 
 
 
@@ -1975,28 +2138,28 @@ LP_median_mean
 
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
 # Fisher's exact test of uniqueness
-
-# Make the contingency tables:
-conTabDat <- biologAllStats %>% 
-  group_by(strain, carbonSource) %>% 
-  summarise(AUCsum=sum(AUCmedian)) %>% 
-  mutate(growth = AUCsum>=growthCutoff) %>% 
-  ungroup() %>% group_by(strain, growth) %>% 
-  select(-AUCsum, -carbonSource)
-ctAP <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20P1'), table(growth, strain))
-ctAF <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20F4'), table(growth, strain))
-ctAT <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20T3'), table(growth, strain))
-ctAC <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20C2'), table(growth, strain))
-
-# Perform Fisher's exact test on the contigency table 
-AP <- fisher.test(ctAP)
-AF <- fisher.test(ctAF)
-AT <- fisher.test(ctAT)
-AC <- fisher.test(ctAC)
-
-p <- c(AP$p.value, AF$p.value, AT$p.value, AC$p.value)
-# B-H correction for all pairwise comparisons
-p.adjust(p, method = 'BH')
+# 
+# # Make the contingency tables:
+# conTabDat <- biologAllStats %>% 
+#   group_by(strain, carbonSource) %>% 
+#   summarise(AUCsum=sum(AUCmedian)) %>% 
+#   mutate(growth = AUCsum>=growthCutoff) %>% 
+#   ungroup() %>% group_by(strain, growth) %>% 
+#   select(-AUCsum, -carbonSource)
+# ctAP <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20P1'), table(growth, strain))
+# ctAF <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20F4'), table(growth, strain))
+# ctAT <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20T3'), table(growth, strain))
+# ctAC <- with(conTabDat %>% filter(strain == 'Day0Anc'|strain == 'Day20C2'), table(growth, strain))
+# 
+# # Perform Fisher's exact test on the contigency table 
+# AP <- fisher.test(ctAP)
+# AF <- fisher.test(ctAF)
+# AT <- fisher.test(ctAT)
+# AC <- fisher.test(ctAC)
+# 
+# p <- c(AP$p.value, AF$p.value, AT$p.value, AC$p.value)
+# # B-H correction for all pairwise comparisons
+# p.adjust(p, method = 'BH')
 
 
 # Calculate the Jaccard Distance between the AUC values for each of the lineages
@@ -2037,38 +2200,88 @@ strain_dist_mat <- as.matrix(strain_dist)
 # ggsave('For Reviewers/window_size_vs_frac_DT.tiff', windowSizePlot,dpi=300,height = 4, width = 4, units='in')
 ```
 
+
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
-otherPipDeletions <- read_csv('For Reviewers/PipDeletionsAllLineages.csv')
-completeDeletionsRaw <- inner_join(Data_S4,otherPipDeletions)
+# Experimenting with growthcurver instead of my code...
+# t_mid -> inflection point...point where we reach half the maximum density
+# r -> growth rate
+# t_gen -> doubling time (h)
 
-completeDeletions <- completeDeletionsRaw %>% gather("carbonSource","grRatio", -gene,-strain)
-# Filter out carbon sources for which the model could not grow in the first place (i.e. there will be NAs for grRatio)
-# Also completeDeletions out unassigned/SPONTANEOUS model artifacts
-completeDeletions <- completeDeletions %>% filter(grRatio != Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
+biologAllGrowthCurves <- biologAllStats %>% ungroup()%>% select(-medianOD600,-IQ25, -IQ75,-plate) %>% mutate(AUCmedian_abs = abs(AUCmedian)) %>% select(-AUCmedian)
+
+AncestorAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day0Anc')
+AncDat <- AncestorAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_Anc <- SummarizeGrowthByPlate(AncDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_anc.pdf", bg_correct = 'none')%>% mutate(strain = 'Day0Anc')
+
+tobAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20T3')
+tobDat <- tobAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_tob <- SummarizeGrowthByPlate(tobDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_tob.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20T3')
+
+pipAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20P1')
+pipDat <- pipAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_pip <- SummarizeGrowthByPlate(pipDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_pip.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20P1')
+
+cipAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20F4')
+cipDat <- cipAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_cip <- SummarizeGrowthByPlate(cipDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_cip.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20F4')
+
+lbeAllGrowth <- biologAllGrowthCurves %>% filter(strain == 'Day20C2')
+lbeDat <- lbeAllGrowth %>% spread(carbonSource,AUCmedian_abs) %>% select(-strain)
+gc_out_lbe <- SummarizeGrowthByPlate(lbeDat, plot_fit = TRUE, plot_file = "Figures and Data/gc_plots_lbe.pdf", bg_correct = 'none')%>% mutate(strain = 'Day20C2')
+
+# Data frame of all the growth dynamics data for all strains on all carbon sources
+# Use t_mid for the time it takes to reach 1/2 the max OD
+growthDynamics <- bind_rows(gc_out_Anc,gc_out_tob,gc_out_cip,gc_out_pip,gc_out_lbe)
+growthDynamics <- growthDynamics %>% mutate(carbonSource = sample) %>% select(-sample)
+
+# Remake Figure 3B,C,E,F with these newly calculated doubling times and time to half carrying capacity (half theoretical max OD600)
+# Load descriptors for these carbon sources 
+growthDynamics <- inner_join(growthDynamics,Fig3_CarbonSourceDescriptors)
+growthDynamics <- growthDynamics %>% arrange(description)
+growthDynamics$carbonSource <- factor(growthDynamics$carbonSource, levels = rev(unique(growthDynamics$carbonSource)),ordered = TRUE)
+
+# Figure 3B - Doubling Time
+Fig3B <- growthDynamics %>% 
+  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = t_gen), color='white')+
+  xlab("")+ylab("")+theme_bw() +  theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) + guides(fill = guide_colorbar(title.position = "top",title.hjust = 0.5, title = 'Doubling Time \n (hr)',label.hjust=0.6))+
+  scale_fill_gradient(low = "grey95", high = "black", trans='log10', limits=c(.1, 30))+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 3C
+Fig3C <- growthDynamics %>% 
+  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
+  ggplot(aes(x=strain, y=carbonSource)) +
+  geom_tile(aes(fill = t_mid), color='white')+
+  xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time to 1/2 K \n (hr)'))+
+  scale_fill_gradient(low = "grey95", high = "black", trans='log10')+
+  scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
+        labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
+
+# Figure 3E - Doubling Time
+Fig3E <- growthDynamics %>% 
+  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
+  ggplot(aes(x=strain, y = t_gen))+
+  geom_boxplot(aes(color = strain), size=1.25)+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+  theme_bw()+scale_y_log10(limits=c(0.1,30))+
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab('Doubling Time (hr)')
+
+# Figure 3F
+Fig3F <- growthDynamics %>% 
+  filter(carbonSource %in% biologAllGrowth$carbonSource) %>% 
+  ggplot(aes(x=strain, y = t_mid))+
+  geom_boxplot(aes(color = strain), size=1.25)+
+  #geom_signif(comparisons=list(c("Day0Anc","Day20P1"), c("Day0Anc","Day20F4")), annotations = c('***','**'), tip_length = 0, y_position = c(1.95, 1.75))+
+  scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
+  theme_bw()+ scale_y_log10() + 
+  theme(axis.text.y = element_text(size=10), axis.title.y=element_text(size=12),legend.position="none", axis.text.x = element_blank())+xlab("")+ylab("Time to 1/2 Carrying Capacity (hr)")
 
 
-essentialDeletions <- completeDeletions %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
-  ungroup() %>% group_by(gene) %>% mutate(isEverEssential = sum(isEssential)) %>% 
-  filter(isEverEssential >= 1)
-
-essentialDeletions$isEssential <- factor(essentialDeletions$isEssential, levels =c(TRUE,FALSE), labels = c('x',''))
-
-essentialDeletions$carbonSource <- factor(essentialDeletions$carbonSource, levels = carbonSourceLevels)
-
-getColors <- brewer_pal('qual') 
-myPalette <- getColors(2)
-names(myPalette) <- levels(essentialDeletions$strain) # Give every color an appropriate name
-
-
-FigReviewer3 <- essentialDeletions %>% 
-  ggplot(aes(carbonSource, gene, fill = isEssential)) + geom_tile(color = 'grey') + 
-   xlab("")+ylab("") + theme_bw()  +
-  theme(axis.text.y = element_text(size = 7 ),axis.text.x = element_text(angle = 90,hjust = 1), legend.position = 'none') +
-  scale_fill_manual(labels = c("Not Essential", "Essential"),values=c("white","black"))
-
-FigReviewer3
-
-ggsave('For Reviewers/otherPIPlineages.tiff', FigReviewer3,dpi=300)
-
+# Remake Figure S8 with newly calculated growth dynamics 
 
 ```
+
+
