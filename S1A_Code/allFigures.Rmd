@@ -1483,6 +1483,7 @@ FigS3B <- S3B_fig_data %>%
 
 
 # C) Maximum OD600 of ancestor and 8 transposon mutants on LB media (with minimum OD600 subtraction)
+asterixHeightsS3C <- S3C_fig_maximums %>% group_by(strain) %>% summarise(h = max(maxOD600)+0.07) %>% filter(strain != "Ancestor",strain != "nuoB",strain != 'PA14_23470')
 FigS3C <- S3C_fig_maximums %>% group_by(strain) %>% 
   ggplot(aes(strain, maxOD600))+
   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
@@ -1493,7 +1494,7 @@ FigS3C <- S3C_fig_maximums %>% group_by(strain) %>%
                   fun.ymax = function(z) {quantile(z,0.75)},
                   fun.y = median,
                 width = 0.1, size = 1)+
-    # annotate("text",x=c("PA14_23470","PA14_57570","nuoB","PA14_41710","PA14_44360","nuoL","PA14_57850"),y = asterixHeights2$h,label = c("*"),size=5)+
+    annotate("text",x=c("PA14_57570","PA14_41710","PA14_44360","PA14_57880","nuoL","PA14_57850"),y = asterixHeightsS3C$h,label = c("*"),size=5)+
   facet_wrap(~media)+
   ylab("Max Growth (OD600)")+ylim(0.5,1.3)+
   scale_color_manual(values =c('grey','green2','green2','green2','green2', 'green2','green2','green2','green2'),breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))+
@@ -2190,7 +2191,38 @@ DWT_DPM$strain <- factor(DWT_DPM$strain, levels = rev(unique(DWT_DPM$strain)), o
 res_DWT_DPM <- wilcox.test(maxOD600 ~ strain, data = DWT_DPM, exact = FALSE)
 
 
-hocquetGrowthRepMaximums
+# Figure S3C
+Anc_nuoL_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='nuoL')
+Anc_nuoL_LB$strain <- factor(Anc_nuoL_LB$strain, levels = rev(unique(Anc_nuoL_LB$strain)), ordered = TRUE)
+resAncNuoL_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_nuoL_LB, exact = FALSE)
+
+Anc_nuoB_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='nuoB')
+Anc_nuoB_LB$strain <- factor(Anc_nuoB_LB$strain, levels = rev(unique(Anc_nuoB_LB$strain)), ordered = TRUE)
+resAncNuoB_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_nuoB_LB, exact = FALSE)
+
+Anc_41710_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='PA14_41710')
+Anc_41710_LB$strain <- factor(Anc_41710_LB$strain, levels = rev(unique(Anc_41710_LB$strain)), ordered = TRUE)
+resAnc41710_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_41710_LB, exact = FALSE)
+
+Anc_23470_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='PA14_23470')
+Anc_23470_LB$strain <- factor(Anc_23470_LB$strain, levels = rev(unique(Anc_23470_LB$strain)), ordered = TRUE)
+resAnc23470_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_23470_LB, exact = FALSE)
+
+Anc_57570_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='PA14_57570')
+Anc_57570_LB$strain <- factor(Anc_57570_LB$strain, levels = rev(unique(Anc_57570_LB$strain)), ordered = TRUE)
+resAnc57570_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_57570_LB, exact = FALSE)
+
+Anc_57880_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='PA14_57880')
+Anc_57880_LB$strain <- factor(Anc_57880_LB$strain, levels = rev(unique(Anc_57880_LB$strain)), ordered = TRUE)
+resAnc57880_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_57880_LB, exact = FALSE)
+
+Anc_44360_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='PA14_44360')
+Anc_44360_LB$strain <- factor(Anc_44360_LB$strain, levels = rev(unique(Anc_44360_LB$strain)), ordered = TRUE)
+resAnc44360_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_44360_LB, exact = FALSE)
+
+Anc_57850_LB <- S3C_fig_maximums %>% filter(strain == 'Ancestor'|strain =='PA14_57850')
+Anc_57850_LB$strain <- factor(Anc_57850_LB$strain, levels = rev(unique(Anc_57850_LB$strain)), ordered = TRUE)
+resAnc57850_LB <- wilcox.test(maxOD600 ~ strain, data = Anc_57850_LB, exact = FALSE)
 
 ```
 
@@ -2333,6 +2365,23 @@ p7 <- c(res_AWT_APM$p.value, res_BWT_BPM$p.value, res_CWT_CPM$p.value, res_DWT_D
 p7
 ```
 
+Figure S3C Statistics
+Maximum Growth on LB (OD600)
+Ancestor vs nuoL
+Ancestor vs nuoB
+Ancestor vs PA14_41710
+Ancestor vs PA14_23470
+Ancestor vs PA14_57570
+Ancestor vs PA14_57880
+Ancestor vs PA14_44360
+Ancestor vs PA14_57850
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
+pS3C <- c(resAncNuoL_LB$p.value, resAncNuoB_LB$p.value,resAnc41710_LB$p.value,resAnc23470_LB$p.value,resAnc57570_LB$p.value,resAnc57880_LB$p.value, resAnc44360_LB$p.value,resAnc57850_LB$p.value)
+# pS3C
+# B-H correction for all pairwise comparisons
+pS3C_multComp <- p.adjust(pS3C, method = 'BH')
+pS3C_multComp
+```
 ### Extra analyses for reviewers
 
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=8, width=7.5}
