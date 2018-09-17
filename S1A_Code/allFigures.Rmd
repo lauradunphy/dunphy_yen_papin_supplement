@@ -31,6 +31,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # install.packages('ggpubr')
 # install.packages('gtable')
 # install.packages('png')
+# install.packages('tiff')
 # install.packages('vegan')
 # install.packages('devtools')
 # install.packages('growthcurver')
@@ -57,6 +58,7 @@ library(cowplot)
 library(ggpubr)
 library(gtable)
 library(png)
+library(tiff)
 library(vegan)
 library(ggdendro)
 library(scales)
@@ -758,7 +760,7 @@ Fig3B <- growthDynamics_Fig3 %>%
 Fig3C <- growthDynamics_Fig3 %>% 
   ggplot(aes(x=strain, y=carbonSource)) +
   geom_tile(aes(fill = t_mid), color='white')+
-  xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time Mid-Exponential (hr)'))+
+  xlab("")+ylab("")+ theme_bw() +theme(axis.text.y = element_blank(), legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1), legend.title=element_text(size=8)) +guides(fill = guide_colorbar( title.position = "top",title.hjust = 0.5, title = 'Time Mid-Exponential \n (hr)'))+
   scale_fill_gradient(low = "grey95", high = "black", trans='log10')+
   scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
@@ -1323,9 +1325,9 @@ write_csv(biologAllStats,'Figures and Data/S1_Data.csv')
 
 Data_S2 <- biologAllStats %>% 
   ungroup() %>% group_by(strain,carbonSource) %>% 
-  summarize(Area_Under_Curve = sum(AUCmedian)) %>% 
-  mutate(Growth = Area_Under_Curve>=growthCutoff)
-  
+  summarize(Area_Under_Curve = sum(AUCmedian)) %>%
+  mutate(Growth = Area_Under_Curve>=growthCutoff) %>% 
+  arrange(strain, Area_Under_Curve)
 
 write_csv(Data_S2,'Figures and Data/S2_Data.csv')
 
@@ -1408,6 +1410,7 @@ ggsave('Figures and Data/S1B_Fig.tiff', FigureS1B,dpi=300)
 
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=8.5, fig.width=7.5, fig.align='center'}
+# THIS IS NOW FIGURE S3
 # Figure S2 - adjusted for median
 FigureS2Dat <- biologAllStats
 FigureS2Dat$carbonSource <- factor(FigureS2Dat$carbonSource, levels = rev(unique(FigureS2Dat$carbonSource)),ordered=TRUE)
@@ -1450,15 +1453,15 @@ FigureS2B <- as_ggplot(arrangeGrob(FigureS2B)) +                                
 FigureS2A
 FigureS2B
 
-ggsave('Figures and Data/S2A_Fig.tiff', FigureS2A,dpi=300)
+ggsave('Figures and Data/S3A_Fig.tiff', FigureS2A,dpi=300)
 
-ggsave('Figures and Data/S2B_Fig.tiff', FigureS2B,dpi=300)
+ggsave('Figures and Data/S3B_Fig.tiff', FigureS2B,dpi=300)
 
 ```
-**S2 Fig. Area under the curve (AUC) on all carbon sources by lineage.** The total median AUC for each lineage on 190 carbon sources where the AUC = sum(growth curve - background). (A) Phenotypic Microarray Plate PM1. (B) Phenotypic Microarray Plate PM2a. The growth curves and backgrounds were averaged across three biological replicates. A lineage was considered to have grown on a given carbon source if the AUC was in the upper quantile.
+**S3 Fig. Area under the curve (AUC) on all carbon sources by lineage.** The total median AUC for each lineage on 190 carbon sources where the AUC = sum(growth curve - background). (A) Phenotypic Microarray Plate PM1. (B) Phenotypic Microarray Plate PM2a. The growth curves and backgrounds were averaged across three biological replicates. A lineage was considered to have grown on a given carbon source if the AUC was in the upper quantile.
 
 ```{r, echo=FALSE, warning=TRUE, message=FALSE,fig.height=5, fig.width=7.5, fig.align='center'}
-# Supplmentary Figure 3
+# Supplmentary Figure 4 (was figure S3)
 
 # A) Growth curves of Ancestor, TOB and LBE lineages on NAG - median biological replicates. Subtract blank
 FigS3A <- S3A_fig_data %>% 
@@ -1549,15 +1552,16 @@ FigS3 <- arrangeGrob(FigS3A, FigS3B+theme(legend.position='none'),FigS3C,FigS3D,
  
 FigureS3
 
-ggsave('Figures and Data/S3_Fig.tiff', FigureS3,height = 5, width = 7.5,units='in',dpi=300)
+ggsave('Figures and Data/S4_Fig.tiff', FigureS3,height = 5, width = 7.5,units='in',dpi=300)
 
   
 
 ```
 
-**S3 Fig. Growth curves of tobramycin-evolved P. aeruginosa and a nuoL transposon mutant on N-acetyl-D-glucosamine.** (A) Growth of all four independently evolved lineages on 20mM N-acetyl-D-glucosamine. Lineages were previously evolved as described in the Methods. TOB-R3 was used for the Biolog plate analysis (TOB, n = 1 isolate). TOB-R4 contains a mutation in the *nuoL* gene and was used in Fig 4 (TOB&#42, n = 2 isolates plotted independently). TOB-R1 and TOB-R2 were not used in this study (n = 1 isolate each). Growth of the ancestral lineage was also measured (n = 1 isolate) (error (shading around line) = standard deviation of seven technical replicates for each isolates).  (B) 48-hour growth curves of the ancestor (grey), TOB&#42 (blue), and a transposon mutant with an insertion in the *nuoL* gene (green) (n = 4 colonies, error (shaded region) = interquartile range). (C) Growth *P. aeruginosa* on N-acetyl-D-glucosamine treated with an electron transport chain inhibitor. The ancestral lineage and a *nuoL* transposon mutant were grown on N-acetyl-D-glucosamine with 12.5μM of the electron transport chain inhibitor CCCP and 0.125% DMSO. As controls, each strain was grown in 0μM CCCP with 0% DMSO and 0μM CCCP with 0.125% DMSO (n = 1 colony of each strain, error = standard deviation across 10 technical replicates for each colony). The negative control (black) contains media that was not inoculated.
+**S4 Fig. Growth curves of tobramycin-evolved P. aeruginosa and a nuoL transposon mutant on N-acetyl-D-glucosamine.** (A) Growth of all four independently evolved lineages on 20mM N-acetyl-D-glucosamine. Lineages were previously evolved as described in the Methods. TOB-R3 was used for the Biolog plate analysis (TOB, n = 1 isolate). TOB-R4 contains a mutation in the *nuoL* gene and was used in Fig 4 (TOB&#42, n = 2 isolates plotted independently). TOB-R1 and TOB-R2 were not used in this study (n = 1 isolate each). Growth of the ancestral lineage was also measured (n = 1 isolate) (error (shading around line) = standard deviation of seven technical replicates for each isolates).  (B) 48-hour growth curves of the ancestor (grey), TOB&#42 (blue), and a transposon mutant with an insertion in the *nuoL* gene (green) (n = 4 colonies, error (shaded region) = interquartile range). (C) Growth *P. aeruginosa* on N-acetyl-D-glucosamine treated with an electron transport chain inhibitor. The ancestral lineage and a *nuoL* transposon mutant were grown on N-acetyl-D-glucosamine with 12.5μM of the electron transport chain inhibitor CCCP and 0.125% DMSO. As controls, each strain was grown in 0μM CCCP with 0% DMSO and 0μM CCCP with 0.125% DMSO (n = 1 colony of each strain, error = standard deviation across 10 technical replicates for each colony). The negative control (black) contains media that was not inoculated.
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
+# Figure S5 Plot (was S4)
 # # S4 Fig Plot - median technical replicates
 # FigureS4 <- S4_fig_growth %>% 
 #   ggplot(aes(timeTidy, AUC))+
@@ -1577,6 +1581,7 @@ ggsave('Figures and Data/S3_Fig.tiff', FigureS3,height = 5, width = 7.5,units='i
 
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 8.5, fig.width = 7.5, fig.align='center'}
+# Figure S5 Plot (was S4)
 # Figure S4A - adjusted for median
 FigS4A_top <- biologPipStats %>% mutate(growth = AUCsum>=growthCutoff) %>% 
   ggplot(aes(carbonSource, strain, fill = growth)) + geom_tile(color = 'grey') + 
@@ -1637,13 +1642,13 @@ FigS4 <- arrangeGrob(FigS4A_top, FigS4A_bottom, FigS4B,FigS4C, ncol = 1, nrow = 
 
 grid.arrange(FigS4A_top, FigS4A_bottom, FigS4B,FigS4C, ncol = 1, nrow = 4, widths= c(100), heights = c(1.8, 5.5,0.5,1.2))
 
-ggsave('Figures and Data/S4_Fig.tiff', FigureS4,dpi=300)
+ggsave('Figures and Data/S5_Fig.tiff', FigureS4,dpi=300)
 
 ```
-**S4 Fig. Complete essentiality predictions in the PIP large deletion.** A) Expansion of Fig 5 that includes all genes that were deleted in the piperacillin-evolved lineage and are included in the iPau1129 GENRE. Additional unique essential gene predictions for B) lineage Day 20 Pip Replicate 2 and C) lineage Day 20 Pip Replicate 3.  (*In vitro*: white = no growth, grey = growth; *in silico*: black = essential gene, white = non-essential gene).
+**S5 Fig. Complete essentiality predictions in the PIP large deletion.** A) Expansion of Fig 5 that includes all genes that were deleted in the piperacillin-evolved lineage and are included in the iPau1129 GENRE. Additional unique essential gene predictions for B) lineage Day 20 Pip Replicate 2 and C) lineage Day 20 Pip Replicate 3.  (*In vitro*: white = no growth, grey = growth; *in silico*: black = essential gene, white = non-essential gene).
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE,fig.height=8, fig.width=4, fig.align='center'}
-
+# Figure S6
 # A) Growth of gnyA on L-leucine
 FigS6A <- ancP1gnyAGrowth %>% 
   filter(media == 'L-Leucine') %>% 
@@ -1695,25 +1700,43 @@ FigS6D <- hocquetGrowth %>% group_by(strain) %>%  ggplot(aes(timeTidy, AUCmedian
   xlab('Time (hr)')+ylab('Growth (OD600)')+theme_bw()+theme(legend.position = 'right', legend.title=element_blank(), strip.background = element_rect(fill='white'), legend.text.align=0, legend.text=element_text(size=6))
 
 
- FigS6 <- arrangeGrob(FigS6A, FigS6B, FigS6C, FigS6D, ncol=1, nrow =4, heights=c(2, 2,2,2),layout_matrix=cbind(c(1,2,3,4)))
+ FigS6 <- arrangeGrob(FigS6A, FigS6B, FigS6C, FigS6D, ncol=1, nrow =4, heights=c(2, 2,2,2.1),layout_matrix=cbind(c(1,2,3,4)))
 
  FigureS6 <- as_ggplot(FigS6) +                                # transform to a ggplot
   draw_plot_label(label = c("A","B","C", "D"), size = 15,
-                  x = c(0, 0,0,0), y = c(1,0.75,0.50, 0.25))
+                  x = c(0, 0,0,0), y = c(1,0.76,0.51, 0.26))
 
 FigureS6
 
-ggsave('Figures and Data/S5_Fig.tiff', FigureS6,dpi=300,height = 7.5, width = 4, units='in')
+ggsave('Figures and Data/S6_Fig.tiff', FigureS6,dpi=300,height = 7.5, width = 4, units='in')
 ```
 
-**S5 Fig. Expanded validation of model-guided gene essentiality predictions.** The median 48-hour growth (OD600) of the ancestral lineage (grey), piperacillin-evolved lineage (red), and a *gnyA* transposon mutant on 20mM of L-leucine (A) or L-isoleucine (B). (C) The median 48-hour growth (OD600) of the ancestral lineage (grey), piperacillin-evolved lineage (red), and *scoA* (solid orange) and *scoB* (dashed orange) transposon mutants on 4-hydroxybenzoic acid. (n = 4 isolates for L-leucine and 4-HBA and 6 isolates for L-isoleucine, error (shaded region) = interquartile range, negative control (black) = uninoculated media).
+**S6 Fig. Expanded validation of model-guided gene essentiality predictions.** The median 48-hour growth (OD600) of the ancestral lineage (grey), piperacillin-evolved lineage (red), and a *gnyA* transposon mutant on 20mM of L-leucine (A) or L-isoleucine (B). (C) The median 48-hour growth (OD600) of the ancestral lineage (grey), piperacillin-evolved lineage (red), and *scoA* (solid orange) and *scoB* (dashed orange) transposon mutants on 4-hydroxybenzoic acid. (n = 4 isolates for L-leucine and 4-HBA and 6 isolates for L-isoleucine, error (shaded region) = interquartile range, negative control (black) = uninoculated media).
 
+```{r, echo=FALSE, warning=FALSE, message=FALSE,fig.height=7, fig.width=6.2, fig.align='center'}
+# Figure S7
+# Arrange PCR results 
+PCR_A <- readTIFF('PCR_images/nuoL.tif')
+PCR_A <- rasterGrob(PCR_A)
+PCR_B <- readTIFF('PCR_images/nuoB_PA14_41710.tif')
+PCR_B <- rasterGrob(PCR_B)
+PCR_C <-  PCR_A # update this once you have new results
 
+ Fig_PCR <- arrangeGrob(PCR_A, PCR_B, PCR_C, ncol=3, nrow =2, heights=c(3.5,3.5),widths=c(3,0.2,3),layout_matrix=cbind(c(1,3),c(NA,3),c(2,3)))
 
-**S6 Fig. Verification of a transposon insertion in the *nuoL* gene via PCR.** The ancestral lineage (top), had a PCR product between 0.5-1kb while the *nuoL* transposon mutant (bottom) had a product between 1-2kb.
+ Figure_PCR <- as_ggplot(Fig_PCR) +                                # transform to a ggplot
+  draw_plot_label(label = c("A","B","C"), size = 15,
+                  x = c(0, 0.5,0), y = c(1,1,0.50))
+
+Figure_PCR
+
+ggsave('Figures and Data/S7_Fig.tiff', Figure_PCR,dpi=300,height = 7, width = 6.2, units='in')
+```
+**S7 Fig. Verification of a transposon insertions via PCR.** The ancestral lineage (top), had a PCR product between 0.5-1kb while the *nuoL* transposon mutant (bottom) had a product between 1-2kb.
 
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center'}
-# S7 Fig -> correlation between AUC and the maximum optical density
+# S8 Fig -> correlation between AUC and the maximum optical density
+# (was Figure S7)
 
 # Calculate pearson correlation for complete dataset
 FigureS8DatAll <- biologAllStats %>% 
@@ -1756,12 +1779,13 @@ FigureS8 <- FigureS8DatAll %>%
 #   geom_text(data = labelsCor, aes(x = x, y = y,
 #                         label = label), parse = TRUE)
 FigureS8
-ggsave('Figures and Data/S7_Fig.tiff', FigureS8,dpi=300,height = 3, width = 5, units='in')
+ggsave('Figures and Data/S8_Fig.tiff', FigureS8,dpi=300,height = 3, width = 5, units='in')
 ```
-**S7 Fig. Correlation between maximum optical density and the area under the curve.** The median area under the curve (AUC) and median maximum OD600 for each lineage grown on each carbon source. Dashed horizontal line denotes the AUC growth cutoff. The Pearson coefficient was 0.943.
+**S8 Fig. Correlation between maximum optical density and the area under the curve.** The median area under the curve (AUC) and median maximum OD600 for each lineage grown on each carbon source. Dashed horizontal line denotes the AUC growth cutoff. The Pearson coefficient was 0.943.
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=8.5, fig.width=8}
-# Figure S8 - Figure 3 with the AUC cutoffs chosen in the sensitivity analysis
+# Figure S2 - Figure 3 with the AUC cutoffs chosen in the sensitivity analysis
+# Was figure S8
 
 # Generate the plots for each AUC shift
 plotList <- list()
@@ -1872,10 +1896,10 @@ FigS9 <- arrangeGrob( maxOD_minus50+theme(legend.position='none'), GR_minus50, L
  FigureS9 <- as_ggplot(FigS9)
  
  FigureS9
- ggsave('Figures and Data/S8_Fig.tiff', FigureS9,dpi=300,height = 8.5, width = 8, units='in')
+ ggsave('Figures and Data/S2_Fig.tiff', FigureS9,dpi=300,height = 8.5, width = 8, units='in')
  
 ```
-**S8 Fig. The effect of varying the AUC growth cutoff value on growth dynamics.** The growth cutoff was increased or decreased by 10%, 25%, and 50%. Growth curves exceeding each cutoff were included in the calculation of the maximum growth density (top row), growth rate (middle row), and time to mid-exponential phase (bottom row).  The calculated growth dynamics with the initial AUC cutoff are shown in the middle column.  
+**S2 Fig. The effect of varying the AUC growth cutoff value on growth dynamics.** The growth cutoff was increased or decreased by 10%, 25%, and 50%. Growth curves exceeding each cutoff were included in the calculation of the maximum growth density (top row), growth rate (middle row), and time to mid-exponential phase (bottom row).  The calculated growth dynamics with the initial AUC cutoff are shown in the middle column.  
 
 
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE, fig.align='center', height=7, width=7}
@@ -2365,7 +2389,7 @@ p7 <- c(res_AWT_APM$p.value, res_BWT_BPM$p.value, res_CWT_CPM$p.value, res_DWT_D
 p7
 ```
 
-Figure S3C Statistics
+Figure S4C Statistics
 Maximum Growth on LB (OD600)
 Ancestor vs nuoL
 Ancestor vs nuoB
@@ -2376,11 +2400,11 @@ Ancestor vs PA14_57880
 Ancestor vs PA14_44360
 Ancestor vs PA14_57850
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, results=TRUE}
-pS3C <- c(resAncNuoL_LB$p.value, resAncNuoB_LB$p.value,resAnc41710_LB$p.value,resAnc23470_LB$p.value,resAnc57570_LB$p.value,resAnc57880_LB$p.value, resAnc44360_LB$p.value,resAnc57850_LB$p.value)
+pS4C <- c(resAncNuoL_LB$p.value, resAncNuoB_LB$p.value,resAnc41710_LB$p.value,resAnc23470_LB$p.value,resAnc57570_LB$p.value,resAnc57880_LB$p.value, resAnc44360_LB$p.value,resAnc57850_LB$p.value)
 # pS3C
 # B-H correction for all pairwise comparisons
-pS3C_multComp <- p.adjust(pS3C, method = 'BH')
-pS3C_multComp
+pS4C_multComp <- p.adjust(pS4C, method = 'BH')
+pS4C_multComp
 ```
 ### Extra analyses for reviewers
 
