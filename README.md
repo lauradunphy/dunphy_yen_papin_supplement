@@ -2,50 +2,13 @@
 All supplemental code and data from Dunphy et al (currently under review)
 biorxiv version applies to commit 8d1eb3e0f8786552ee8ffd3517922d470db3c5a5 and earlier
 
-S1A (previously S1) Code - MATLAB sample code to calculate growth dynamics
+S1A Code - R code and data to regenerate paper figures and calculate growth dynamics
 
-S1B (previously S2) Code - R code and data to regenerate paper figures
+S1B Code - MATLAB code to perform gene essentiality predictions
 
-S1C (previously S3) Code - MATLAB code to perform gene essentiality predictions
+README Information
 
-
-README Information (From S1 Text)
-
-S1A Code. MATLAB sample code to calculate growth dynamics
-
-Software information:
- MATLAB R2016b
-
-Installation:
-
-o	Obtain a MATLAB license from https://www.mathworks.com/
-
-o	Install the appropriate version of MATLAB for your operating system and activate your license.
-
-o	Download the S1A Code zip folder into your MATLAB folder or another known location and unzip it. 
-
-Scripts:
-
-o	S1_Code_Implementation.m – Run this script to calculate and plot the growth dynamics of the 20 carbon sources supporting growth of all five lineages (plots each biological replicate separately). To avoid plotting all 300 growth curves, comment out line 23.
-
-o	calcGrowthDynamics.m – Function called by S1_Code_Implementation.m. This script contains the algorithm for calculating the growth rate and time to mid-exponential for each growth curve. 
-
-Data files: 
-
-o	S1_RawData.mat – This is a .mat file containing the data needed from S1_RawData.csv needed to calculate growth dynamics. 
-
-o	S1_RawData.csv – All raw growth data for three replicates of five lineages on the 20 carbon sources in Fig 5. Note that the data in the main text are all averaged across the three replicates. 
-
-Instructions:
-
-o	Open MATLAB and change your path to the S1 Code folder (or folder where you have the above scripts and data files stored).
-
-o	Run S1_Code_Implementation.m to calculate growth dynamics from the manuscript. (Keep in mind that the values reported in Fig 5 and S3 Data are the averages of what this script generates)
-
-o	To calculate growth dynamics of your own growth curve data, you can write your own script that uses the provided function calcGrowthDynamics. 
-
-
-S1B Code. R code and data to regenerate figures
+S1A Code. R code and data to regenerate figures and calculate growth dynamics
 
 Software information:
 R Version 3.4.0
@@ -53,7 +16,7 @@ R Version 3.4.0
 Installation: 
 o	Download RStudio (open source license) from https://www.rstudio.com/products/rstudio/download/ 
 
-o	Create a new project in the S1 Data folder by opening RStudio, selecting File->New Project… -> New Directory -> Empty Project. Enter a directory name (can be anything you want), and choose S1 Data as the subdirectory. Make sure that the project is in the S1 Data folder and not in a subfolder. 
+o	Create a new project in the S1A Code folder by opening RStudio, selecting File->New Project… -> New Directory -> Empty Project. Enter a directory name (can be anything you want), and choose S1A Code as the subdirectory. Make sure that the project is in the S1 Code folder and not in a subfolder. 
  
 Required R packages:
 
@@ -93,13 +56,22 @@ o	gtable
 
 o	png 
 
+o vegan
+
+o	growthcurver
+
+o	scales
+
+o	ggdendro 
+
+o	tiff
+
+
 All available using install.packages(‘packageName’), or the first chunk of code in allFigures.Rmd can be uncommented the first time the file is run. 
 
 Scripts:
 
 o	allFigures.Rmd
-
-Data files: 
 
 o	biologDataPM1.csv – All growth data on Phenotypic Microarray Plate PM1
 
@@ -111,11 +83,17 @@ o	headersPM2.csv – Carbon source labels from plate PM2a
 
 o	biologGrowthDynamics.csv – All calculated growth dynamics
 
-o	growthDataNAG.csv – Growth data from Figure 4 (previously growthDataGlcNAc.csv)
+o	carbonSourceDescriptors.csv – Pathway descriptions for carbon sources in Figure 3
+
+o	growthDataNAG.csv (1 through 4) – Growth data from Figures 4A, 4B, S4A, S4B
+
+o	NAG_mutants_key.csv – Key between mutant labels in Figure 4B data and gene locus tags
 
 o	mutationsPIP.csv – Mutated genes in the piperacillin-evolved lineage
 
 o	geneEssentialityPredictions.csv – Predicted essential genes by carbon source
+
+o	PipDeletionsAllLineages.csv – All other genes in PIP-evolved lineages not in the large deletion of PIP-R1. Used in Figure S5B-C
 
 o	growthDataLeucine.csv – Growth data of ancestor, PIP, and gnyA on 40mM L-Leucine (all 4 biological replicates)
 
@@ -123,23 +101,21 @@ o	growthData4HBA_1.csv – Half of the growth data on 4HBA
 
 o	growthData4HBA_2.csv – The other half of the growth data on 4HBA
 
+o	growthDataHocquet_1.csv – Half of the growth data of the Hocquet isolates grown on L-leucine
+
+o	growthDataHocquet_2.csv – The other half of the Hocquet growth data
+
 o	growthDataIsoleucine_gnyA.csv – Growth data from S6 Fig.
-
-o	growthDataGlcNAc_supplementalLineages.csv – Growth data from S3 Fig. 
-
-o	growthDataGlcNAc_CCCP.csv – Growth data from S4 Fig.
-
-o	growthDataHocquet_1.csv – Growth data from Fig 7. 
-
-o	growthDataHocquet_1csv – Growth data from Fig 7. 
 
 o	Figures and Data folder – Empty folder where figures/data generated by the script will be saved
 
+o	PCR_images folder – Folder containing labeled gels verifying transposon insertions
+
 Instructions: 
 
-o	Prior to this point, RStudio must be installed with the appropriate packages and a new project must be created in the S1 Data folder.
+o	Prior to this point, RStudio must be installed with the appropriate packages and a new project must be created in the S1A Code folder.
 
-o	Open the project in the S1 Data folder.
+o	Open the project in the S1A Code folder.
 
 o	Open the script allFigures.Rmd in the project (File -> Open File…).
 
@@ -148,16 +124,13 @@ o	Run the script by clicking Knit->Knit to HTML in the upper left-hand corner of
 o	This will generate the following:
 
   •	An HTML file containing all of the figures and figure captions
-  
-  •	Figures 2-7 from the main manuscript as .pdf files
-  
-  •	Figures S1-S9 excluding S7 as .pdf files 
-  
+  •	Figures 2-6 from the main manuscript as .pdf files
+  •	Figures S1-S6 and S8 as .tiff files 
   •	Data S1-S4 as .csv files
-
 Figures can easily be changed to different file formats (e.g. jpg, png, etc.) or saved to different locations by changing adjusting the filenames and paths within ggsave functions. A call to ggsave can be found at the bottom of the code for each figure. 
 
-S1C Code. MATLAB code to perform gene essentiality predictions.
+
+S1B Code. MATLAB code to perform gene essentiality predictions.
 
 Software information:
  MATLAB R2016b,
@@ -172,11 +145,11 @@ o	Cobra Toolbox – Can be downloaded from: https://github.com/opencobra/cobrato
 
 o	Check that your solver and toolbox are installed correctly with the following commands:
 
-•	initCobraToolbox (this command initializes the toolbox)
+  •	initCobraToolbox (this command initializes the toolbox)
 
-•	changeCobraSolver(‘solvername’) (where solver name is ‘gurobi5’ or ‘gurobi6’)
+  •	changeCobraSolver(‘solvername’) (where solver name is ‘gurobi5’ or ‘gurobi6’)
 
-•	testAll (note that not all tests will pass with the gurobi solver)
+  •	testAll (note that not all tests will pass with the gurobi solver)
 
 Scripts:
 
