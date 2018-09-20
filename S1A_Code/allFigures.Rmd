@@ -1720,7 +1720,8 @@ PCR_A <- readTIFF('PCR_images/nuoL.tif')
 PCR_A <- rasterGrob(PCR_A)
 PCR_B <- readTIFF('PCR_images/nuoB_PA14_41710.tif')
 PCR_B <- rasterGrob(PCR_B)
-PCR_C <-  PCR_A # update this once you have new results
+PCR_C <-  readTIFF('PCR_images/gnyA_scoAB_other5_mutants.tif')
+PCR_C <- rasterGrob(PCR_C)
 
  Fig_PCR <- arrangeGrob(PCR_A, PCR_B, PCR_C, ncol=3, nrow =2, heights=c(3.5,3.5),widths=c(3,0.2,3),layout_matrix=cbind(c(1,3),c(NA,3),c(2,3)))
 
