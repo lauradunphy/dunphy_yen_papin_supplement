@@ -589,6 +589,25 @@ hocquetGrowth$strain <- factor(hocquetGrowth$strain, levels =c("AWT","APM", "BWT
 
 
 ```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+MICraw <- read_csv('MIC_tidy.csv')
+MICtidy <- MICraw %>% gather("concTOB","OD600",4:15) %>% mutate(concTOB = as.numeric(concTOB))
+# Background subtract (medians of all 512ug/ml wells)
+MICbackground <- MICtidy %>% filter(concTOB == 512) %>% mutate(background = median(OD600))
+# After background, filter by growth (background > 0.1), and convert to MIC
+MICtidy <- MICtidy %>% mutate(backgroundSubtracted = OD600 - MICbackground$background) %>% group_by(ID,strain, replicate) %>% filter(backgroundSubtracted > 0.1) %>% summarise(concTOBmax = max(concTOB)) %>% mutate(MIC = ifelse(concTOBmax == 0, 0.5, concTOBmax * 2))
+# Take the median MIC across technical replicates
+MICtech <- MICtidy %>% ungroup() %>% group_by(strain, ID) %>% summarise(intermediateMIC = median(MIC))
+
+# Take the median MIC across biological replicates (Table 1 values)
+MICfinal <- MICtech %>% ungroup() %>% group_by(strain) %>% summarise(medianMIC = median(intermediateMIC), IQ25 = quantile(intermediateMIC, 1/4), IQ75 = quantile(intermediateMIC, 3/4), log2MIC = log2(medianMIC))
+MICfinal
+
+# Calculate the MIC relative to the Ancestor (potential table 1 values)
+MICfinal %>% group_by(strain) %>% summarise(relativeMIC = medianMIC / 0.75)
+
+```
 ## **Figures**
 Note: Fig 1 and S7 Fig are not included in this document, but their figure captions are provided below.
 
@@ -1722,7 +1741,7 @@ PCR_B <- readTIFF('PCR_images/nuoB_PA14_41710.tif')
 PCR_B <- rasterGrob(PCR_B)
 PCR_C <-  readTIFF('PCR_images/gnyA_scoAB_other5_mutants.tif')
 PCR_C <- rasterGrob(PCR_C)
-
+c
  Fig_PCR <- arrangeGrob(PCR_A, PCR_B, PCR_C, ncol=3, nrow =2, heights=c(3.5,3.5),widths=c(3,0.2,3),layout_matrix=cbind(c(1,3),c(NA,3),c(2,3)))
 
  Figure_PCR <- as_ggplot(Fig_PCR) +                                # transform to a ggplot
