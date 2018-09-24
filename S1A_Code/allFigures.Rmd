@@ -602,10 +602,10 @@ MICtech <- MICtidy %>% ungroup() %>% group_by(strain, ID) %>% summarise(intermed
 
 # Take the median MIC across biological replicates (Table 1 values)
 MICfinal <- MICtech %>% ungroup() %>% group_by(strain) %>% summarise(medianMIC = median(intermediateMIC), IQ25 = quantile(intermediateMIC, 1/4), IQ75 = quantile(intermediateMIC, 3/4), log2MIC = log2(medianMIC))
-MICfinal
+# MICfinal
 
 # Calculate the MIC relative to the Ancestor (potential table 1 values)
-MICfinal %>% group_by(strain) %>% summarise(relativeMIC = medianMIC / 0.75)
+# MICfinal %>% group_by(strain) %>% summarise(relativeMIC = medianMIC / 0.75)
 
 ```
 ## **Figures**
@@ -928,7 +928,7 @@ ggsave('Figures and Data/Fig3.pdf',Figure3,height=8.5, width=7.5, units="in", dp
 
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE,fig.height=6, fig.width=5, fig.align='center'}
 # Generate a new Figure 4
-asterixHeights <- Fig4AMaximums %>% group_by(strain) %>% summarise(h = max(maxOD600)+0.03) %>% filter(strain != "Day0Anc",strain != "Day20T4")
+asterixHeights <- Fig4AMaximums %>% group_by(strain) %>% summarise(h = max(maxOD600)+0.04) %>% filter(strain != "Day0Anc",strain != "Day20T4")
   Figure4AJitter <- Fig4AMaximums %>% group_by(strain) %>% 
   ggplot(aes(strain, maxOD600))+
   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
@@ -942,12 +942,12 @@ asterixHeights <- Fig4AMaximums %>% group_by(strain) %>% summarise(h = max(maxOD
   annotate("text",x=c("Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3"),y = asterixHeights$h,label = c("*"),size=5)+
   # geom_signif(comparisons=list(c("Day0Anc", "Day20C1"), c("Day0Anc,Day20C2"),c("Day0Anc,Day20C3"),c("Day0Anc","Day20C4")), annotations=c("*","*","*","*"), tip_length = 0, y_position = c(0.12,0.14,0.16,0.18))+
   facet_wrap(~media)+
-  ylab("Max Growth (OD600)")+ylim(0,0.23)+
+  ylab("Max Growth (OD600)")+ylim(0,0.24)+
   scale_color_manual(values =c('grey','black','black','black','black', 'dodgerblue2','dodgerblue2','dodgerblue2','dodgerblue2'),breaks=c("Day0Anc","Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3","Day20T4"),labels=c("Ancestor","LBE 1","LBE 2","LBE 3","LBE 4","TOB 1","TOB 2","TOB 3","TOB 4"))+
 theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
   scale_x_discrete(breaks=c("Day0Anc","Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3","Day20T4"),labels=c("Ancestor","LBE 1","LBE 2","LBE 3","LBE 4","TOB 1","TOB 2","TOB 3","TOB 4"))
   
-  asterixHeights2 <- Fig4BMaximums %>% group_by(strain) %>% summarise(h = max(maxOD600)+0.03) %>% filter(strain != "Day0Anc",strain != "PA14_57880")
+  asterixHeights2 <- Fig4BMaximums %>% group_by(strain) %>% summarise(h = max(maxOD600)+0.04) %>% filter(strain != "Day0Anc",strain != "PA14_57880")
   Figure4BJitter <- Fig4BMaximums %>% group_by(strain) %>% 
   ggplot(aes(strain, maxOD600))+
   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
@@ -961,7 +961,7 @@ theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='
     annotate("text",x=c("PA14_23470","PA14_57570","nuoB","PA14_41710","PA14_44360","nuoL","PA14_57850"),y = asterixHeights2$h,label = c("*"),size=5)+
   # geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
   facet_wrap(~media)+
-  ylab("Max Growth (OD600)")+ylim(0,0.23)+
+  ylab("Max Growth (OD600)")+ylim(0,0.24)+
   scale_color_manual(values =c('grey','green2','green2','green2','green2', 'green2','green2','green2','green2'),breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))+
 theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
   scale_x_discrete(breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))
