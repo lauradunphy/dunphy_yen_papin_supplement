@@ -1073,7 +1073,7 @@ grid.arrange(Fig5_bottom+theme(legend.position = 'none'), Fig5_top+theme(legend.
 
 Figure5 <- arrangeGrob(Fig5_bottom+theme(legend.position = 'none'), Fig5_top+theme(legend.position = 'none'),legend_5T,legend_5B,geneNames, ncol = 3, nrow = 4, widths= c(18,75,17), heights = c(40, 15,20,20), layout_matrix=cbind(c(5,5,5,5),c(2,1,1,1), c(NA,3,4,NA)))
 
-ggsave('Figures and Data/Fig5.pdf',Figure5,dpi=300)
+ggsave('Figures and Data/Fig5.tiff',Figure5,dpi=300)
 ```
 **Fig 5. Model-guided prediction of loss of metabolic function in piperacillin-evolved *P. aeruginosa*.** Experimental growth calls of the piperacillin-evolved and ancestral lineages on carbon sources able to support growth on the base iPau1129 model (top). Model predicted genes essential for growth on minimal media with each carbon source (bottom). Only the subset of essential genes that were found to be deleted in the piperacillin-evolved lineage are included (*In vitro*: white = no growth, grey = growth; *in silico*: X = essential gene, blank = non-essential gene).
 
