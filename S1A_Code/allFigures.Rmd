@@ -687,7 +687,7 @@ Fig2C <- Fig2CDat %>%
   annotate("text",x = signif_heights_2C$strain, y = signif_heights_2C$h, label=c("***","***","***","**"),size=5)+
   # geom_signif(comparisons=list(c("Day0Anc", "Day20C2"), c("Day0Anc","Day20F4"), c("Day0Anc","Day20P1"),c("Day0Anc","Day20T3")), annotations=c("***","***","***","**"), tip_length = 0, y_position = c(0.65, 0.72, 0.79,0.86))+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"))+
-  theme_bw()+ ylim(0,0.90)+
+  theme_bw()+ ylim(0,0.65)+
    scale_x_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))+
   theme(axis.text.y = element_text(size=10),axis.text.x=element_text(angle=45,hjust=1), axis.title.x=element_blank(), axis.title.y=element_text(size=12),legend.position="none")+ylab('Max Growth (OD600)')
