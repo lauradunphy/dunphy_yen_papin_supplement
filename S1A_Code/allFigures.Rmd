@@ -652,12 +652,14 @@ carbonSourceLevels_2A <- Fig2Adat %>% filter(strain == 'Day0Anc') %>% arrange(AU
 Fig2Adat$carbonSource <- factor(Fig2Adat$carbonSource, levels = rev(carbonSourceLevels_2A$carbonSource), ordered = TRUE)
 
 Fig2A <- Fig2Adat %>% ggplot(aes(carbonSource, strain))+
+  # geom_tile(aes(fill=AUCsum), color='black',size = 0.25)+ # should be growth changed to AUCsum to see how it looked
   geom_tile(aes(fill=growth), color='black',size = 0.25)+
   xlab("Carbon Sources")+ theme_bw() + 
   theme(axis.ticks.x=element_blank(),
         legend.title=element_blank(),legend.position='top',axis.title.y=element_blank(),
         axis.title.x = element_text(margin = margin(t = -0.8, r = 0, b = 0, l = 0))) +
   scale_fill_manual(labels = c("No Growth  ", "Growth"),values=c("white","grey50"))+
+  # scale_fill_continuous(high = 'black',low = 'white')
   scale_y_discrete(breaks=c("Day0Anc","Day20C2","Day20F4","Day20P1","Day20T3"),
         labels=c("Ancestor", "LBE", "CIP","PIP","TOB"))
 
@@ -736,7 +738,7 @@ Fig2Legend <- get_legend(Fig2A)
 Figure2 <- arrangeGrob(Fig2B, Fig2C,Fig2A+theme(legend.position = 'none', axis.text.x = element_blank()),Fig2D,Fig2Legend, Fig2AClust, nrow=4,ncol=5, layout_matrix=cbind(c(5,3,NA,1), c(5,3,NA,2),c(5,3,NA,4),c(5,6,6,4),c(5,6,6,4)), heights=c(10,75,10,110), widths=c(35,35,20,5,10))
 
 Figure2 <- as_ggplot(Figure2) + draw_plot_label(label = c("A","B","C","D"), size = 15, x = c(0, 0, 0.33, 0.67), y = c(1, 0.57,0.57,0.57))
-ggsave('Figures and Data/Fig2.tiff',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
+ggsave('Figures and Data/Fig2_AUC.tiff',plot = Figure2, width = 7.5, height = 5, units="in",dpi=400)
 
 Figure2
 
@@ -928,7 +930,7 @@ ggsave('Figures and Data/Fig3.pdf',Figure3,height=8.5, width=7.5, units="in", dp
 
 ```{r, echo=FALSE,results=TRUE, warning=FALSE, message=FALSE,fig.height=6, fig.width=5, fig.align='center'}
 # Generate a new Figure 4
-asterixHeights <- Fig4AMaximums %>% group_by(strain) %>% summarise(h = max(maxOD600)+0.04) %>% filter(strain != "Day0Anc",strain != "Day20T4")
+asterixHeights <- Fig4AMaximums %>% group_by(strain) %>% summarise(h = 0.225) %>% filter(strain != "Day0Anc",strain != "Day20T4")
   Figure4AJitter <- Fig4AMaximums %>% group_by(strain) %>% 
   ggplot(aes(strain, maxOD600))+
   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
@@ -947,7 +949,7 @@ asterixHeights <- Fig4AMaximums %>% group_by(strain) %>% summarise(h = max(maxOD
 theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
   scale_x_discrete(breaks=c("Day0Anc","Day20C1","Day20C2","Day20C3","Day20C4","Day20T1","Day20T2","Day20T3","Day20T4"),labels=c("Ancestor","LBE 1","LBE 2","LBE 3","LBE 4","TOB 1","TOB 2","TOB 3","TOB 4"))
   
-  asterixHeights2 <- Fig4BMaximums %>% group_by(strain) %>% summarise(h = max(maxOD600)+0.04) %>% filter(strain != "Day0Anc",strain != "PA14_57880")
+  asterixHeights2 <- Fig4BMaximums %>% group_by(strain) %>% summarise(h = 0.225) %>% filter(strain != "Day0Anc",strain != "PA14_57880")
   Figure4BJitter <- Fig4BMaximums %>% group_by(strain) %>% 
   ggplot(aes(strain, maxOD600))+
   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
@@ -962,11 +964,11 @@ theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='
   # geom_signif(comparisons=list(c("Day0Anc", "Day20T4"), c("Day0Anc","nuoL")), annotations=c("*","*"), tip_length = 0, y_position = c(0.12,0.14))+
   facet_wrap(~media)+
   ylab("Max Growth (OD600)")+ylim(0,0.24)+
-  scale_color_manual(values =c('grey','green2','green2','green2','green2', 'green2','green2','green2','green2'),breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))+
+  scale_color_manual(values =c('grey','green2','green2','green2','green2', 'green2','green2','green2','green2'),breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570',expression(italic('nuoB')),'PA14_41710','PA14_44360','PA14_57880',expression(italic('nuoL')),'PA14_57850'))+
 theme_bw()+theme(legend.position = 'none',strip.background = element_rect(fill='white'), axis.title.x = element_blank(), axis.text.x = element_text(angle=45, hjust=1))+
-  scale_x_discrete(breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'))
- 
-# Arrange Figure 4
+  scale_x_discrete(breaks=c('Day0Anc','PA14_23470','PA14_57570','nuoB','PA14_41710','PA14_44360','PA14_57880','nuoL','PA14_57850'),labels = c('Ancestor','PA14_23470','PA14_57570',expression(italic('nuoB')),'PA14_41710','PA14_44360','PA14_57880',expression(italic('nuoL')),'PA14_57850'))
+
+  # Arrange Figure 4
   Fig4 <- arrangeGrob(Figure4AJitter, Figure4BJitter, ncol=1, nrow =2, heights=c(3,3),layout_matrix=cbind(c(1,2)))
 
  Figure4 <- as_ggplot(Fig4) +                                # transform to a ggplot
@@ -1100,7 +1102,7 @@ Fig6AB <- rasterGrob(Fig6AB)
 
  # Trying to make Figure 6C points instead of bar graphs
   signif_strains_6C <- c("Day20P1","gnyA")
-  signif_heights_6C <- ancP1gnyAMaximums %>% group_by(strain) %>% summarise(h=max(maxOD600)+0.005) %>% filter(strain %in% signif_strains_6C)
+  signif_heights_6C <- ancP1gnyAMaximums %>% group_by(strain) %>% summarise(h=0.085) %>% filter(strain %in% signif_strains_6C)
   Fig6C <- ancP1gnyAMaximums %>% group_by(strain) %>% 
   ggplot(aes(strain, maxOD600))+
   geom_point(aes(color = strain),position = position_jitter(w = 0.35, h = 0))+
@@ -1189,7 +1191,7 @@ ancP1scoABGrowth %>%
 
 # Fig7Dat <- hocquetGrowthRepDistribution
 Fig7Dat2 <- hocquetGrowthRepMaximums
-signif_heights_7 <- Fig7Dat2 %>% group_by(strain) %>% summarise(h=max(maxOD600)+0.005)
+signif_heights_7 <- Fig7Dat2 %>% group_by(strain) %>% summarise(h=0.058)
 signif_heights_7A <- signif_heights_7 %>% filter(strain == 'APM')
 signif_heights_7B <- signif_heights_7 %>% filter(strain == 'BPM')
 signif_heights_7C <- signif_heights_7 %>% filter(strain == 'CPM')
@@ -1375,7 +1377,7 @@ write_csv(Data_S4,'Figures and Data/S4_Data.csv')
 ```
 
 
-```{r, echo=FALSE, fig.align='center', fig.height=8.5, fig.width=7.5, message=FALSE, warning=FALSE}
+```{r, echo=FALSE, fig.align='center', fig.height=18, fig.width=7.5, message=FALSE, warning=FALSE}
 # Figure S1 - adjusted for median
 
 # Had to remove hyphens in order to get the titles in the facet to fit correctly.
@@ -1391,20 +1393,20 @@ FigureS1A <- biologAllStats %>%
   group_by(strain, carbonSource) %>% 
   filter(plate =='PM1') %>% 
   ggplot(aes(timePoint,AUCmedian)) + geom_line(aes(color=strain))+
-  facet_wrap(~carbonSource,10,10,labeller=label_wrap_gen2())+
+  facet_wrap(~carbonSource,15,7,labeller=label_wrap_gen2())+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+xlab('Time (hr)')+ ylab("Growth (OD600)")+
   theme_bw()+
-  theme(legend.title=element_blank(),legend.position="top",legend.direction = "horizontal", strip.text=element_text(size=5.5), axis.text = element_text(size=7)) 
+  theme(legend.title=element_blank(),legend.position="top",legend.direction = "horizontal", strip.text=element_text(size=6), axis.text = element_text(size=7)) 
 
 # Figure S1 B - Plate PM2a
 FigureS1B <- biologAllStats %>% 
   group_by(strain, carbonSource) %>% 
   filter(plate =='PM2') %>% 
   ggplot(aes(timePoint,AUCmedian)) + geom_line(aes(color=strain))+
-  facet_wrap(~carbonSource,10,10,labeller=label_wrap_gen2())+
+  facet_wrap(~carbonSource,15,7,labeller=label_wrap_gen2())+
   scale_colour_manual(values = c('grey','black','gold2','red','dodgerblue2'),breaks=c("Day0Anc",'Day20C2',"Day20F4","Day20P1","Day20T3"),labels=c("Ancestor","LBE","CIP","PIP","TOB"))+xlab('Time (hr)')+ ylab("Growth (OD600)")+
   theme_bw()+
-  theme(legend.title=element_blank(),legend.position="top",legend.direction = "horizontal", strip.text=element_text(size=5.5), axis.text = element_text(size=7)) 
+  theme(legend.title=element_blank(),legend.position="top",legend.direction = "horizontal", strip.text=element_text(size=6), axis.text = element_text(size=7)) 
 
 
 FigureS1A <- as_ggplot(arrangeGrob(FigureS1A)) +                                # transform to a ggplot
@@ -1428,7 +1430,7 @@ ggsave('Figures and Data/S1B_Fig.tiff', FigureS1B,dpi=300)
 **S1 Fig. Growth curves of all lineages on all carbon sources.** Median 48-hour growth curves of the five lineages (ancestral, LB-evolved, CIP-evolved, PIP-evolved, TOB-evolved) on 190 carbon sources. (A) Growth on carbon sources from Phenotypic Microarray Plate PM1. (B) Growth on carbon sources from Phenotypic Microarray Plate PM2a. Each curve represents the average of three biological replicates. Growth is measured as the OD600 - background, where the background was an inoculated well containing media with no carbon source.
 
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=8.5, fig.width=7.5, fig.align='center'}
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=18, fig.width=7.5, fig.align='center'}
 # THIS IS NOW FIGURE S3
 # Figure S2 - adjusted for median
 FigureS2Dat <- biologAllStats

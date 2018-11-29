@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+# ignore directory
+Fig_S1A.tiff
+Fig_S1B.tiff
