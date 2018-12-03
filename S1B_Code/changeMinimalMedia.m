@@ -34,6 +34,7 @@ modelout = model;
 
 modelout.lb(exchangeindices) = zeros(size(exchangeindices));
 modelout.ub(exchangeindices) = 1000*ones(size(exchangeindices));
+
 %Limit aerobic growth to 20 mmol/gDW/hr of O2 (EX_O2 removed from openexchanges)
 modelout.lb(findRxnIDs(modelout,{'EX_cpd00007(e)'})) = -20; 
 

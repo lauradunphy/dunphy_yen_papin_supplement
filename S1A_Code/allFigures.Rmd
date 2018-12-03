@@ -327,7 +327,7 @@ essentialityPredictionsRaw <- read_csv("geneEssentialityPredictions.csv")
 essentialityPredictions <- essentialityPredictionsRaw %>% gather("carbonSource","grRatio", -gene)
 # Filter out carbon sources for which the model could not grow in the first place (i.e. there will be NAs for grRatio)
 # Also filter out unassigned/SPONTANEOUS model artifacts
-essentialityPredictions <- essentialityPredictions %>% filter(grRatio != Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
+essentialityPredictions <- essentialityPredictions %>% filter(grRatio != Inf,grRatio != -Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
 
 # 2. All genes in model and whether or not they were mutated in PipR (1 = mutated)
 PipRMutationBinary <- essentialityPredictions %>%  select(gene) %>% unique() %>% group_by(gene) %>% mutate(geneCount = n())
@@ -347,7 +347,7 @@ biologPipStats <- biologAllStats %>%
 modelCarbonSources <- essentialityPredictions %>% select(carbonSource) %>% unique()
 biologPipStats <- inner_join(biologPipStats, modelCarbonSources, 'carbonSource')
 biologPipStats$strain <- factor(biologPipStats$strain, levels=c('Day20P1','Day0Anc'))
-carbonSourceLevels = c('4-Hydroxy Benzoic Acid', 'D-Alanine','Inosine','L-Alanine','L-Leucine','L-Ornithine','Malonic Acid','Adenosine','D-Malic Acid','D-Ribose','D-Serine','D,L-alpha-Glycerol Phosphate','Glycine','L-Phenylalanine','L-Serine','L-Threonine','2-Aminoethanol','Acetic Acid','alpha-D-Glucose','alpha-Keto-Glutaric Acid','Citric Acid','D-Fructose','D-Gluconic Acid','D-Mannitol','Fumaric Acid','gamma-Amino Butyric Acid','Glycerol','Itaconic Acid','L-Arginine','L-Asparagine','L-Aspartic Acid','L-Glutamic Acid','L-Glutamine','L-Histidine','L-Isoleucine','L-Lactic Acid','L-Malic Acid','L-Proline','Putrescine','Pyruvic Acid','Succinic Acid')
+carbonSourceLevels = c('4-Hydroxy Benzoic Acid', 'D-Alanine','Inosine','L-Alanine','L-Leucine','L-Ornithine','Malonic Acid','Adenosine','D-Malic Acid','D-Ribose','D-Serine','D,L-alpha-Glycerol Phosphate','Glycine','L-Phenylalanine','L-Serine','L-Threonine','2-Aminoethanol','Acetic Acid','alpha-D-Glucose','alpha-Keto-Glutaric Acid','Citric Acid','D-Fructose','D-Gluconic Acid','D-Mannitol','Fumaric Acid','gamma-Amino Butyric Acid','Glycerol','Itaconic Acid','L-Arginine','L-Asparagine','L-Aspartic Acid','L-Glutamic Acid','L-Glutamine','L-Histidine','L-Isoleucine','L-Lactic Acid','L-Malic Acid','L-Proline','N-Acetyl-D Glucosamine','Putrescine','Pyruvic Acid','Succinic Acid')
 biologPipStats$carbonSource <- factor(biologPipStats$carbonSource, levels = carbonSourceLevels )
 
 # 4. Filter to only include genes that are mutated in PIP that are essential on at least one carbon source
@@ -1629,7 +1629,7 @@ pip234dat_raw <- inner_join(Data_S4,pip234dat_raw)
 pip234dat <- pip234dat_raw %>% gather("carbonSource","grRatio", -gene,-strain)
 # Filter out carbon sources for which the model could not grow in the first place (i.e. there will be NAs for grRatio)
 # Also completeDeletions out unassigned/SPONTANEOUS model artifacts
-pip234dat <- pip234dat %>% filter(grRatio != Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
+pip234dat <- pip234dat %>% filter(grRatio != Inf,grRatio != -Inf, grRatio != 'NaN', grRatio != '#NAME?') %>% filter(gene != 'Unassigned', gene != 'SPONTANEOUS', gene != 'unassigned')
 
 
 essentialDeletions234 <- pip234dat  %>% mutate(isEssential = as.numeric(grRatio) <= 0.001) %>% 
