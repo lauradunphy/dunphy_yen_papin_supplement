@@ -1,5 +1,6 @@
 # dunphy_yen_papin_supplement
-All supplemental code and data from Dunphy et al (currently under review)
+All supplemental code and data from Dunphy et al 
+DOI:https://doi.org/10.1016/j.cels.2018.12.002
 biorxiv version applies to commit 8d1eb3e0f8786552ee8ffd3517922d470db3c5a5 and earlier
 
 S1A Code - R code and data to regenerate paper figures and calculate growth dynamics
